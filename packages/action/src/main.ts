@@ -11,7 +11,6 @@ import {
   LLMTimeoutError,
   PRNotFoundError,
   GitHubAuthError,
-  NoDriftableDocsError,
 } from "@docdrift/core";
 
 const DOCDRIFT_COMMENT_MARKER = "<!-- docdrift-analysis -->";
@@ -43,13 +42,14 @@ async function run(): Promise<void> {
   const token = core.getInput("github-token", { required: true });
   const apiKey = core.getInput("anthropic-api-key", { required: true });
   const modelId = core.getInput("model") || undefined;
+  const scaffoldEnabled = core.getInput("scaffold-missing-docs") !== "false";
 
   const octokit = new Octokit({ auth: token });
   const llm = new AnthropicProvider(apiKey, modelId);
 
   const analyzer = new DiffAnalyzer(octokit);
   const retriever = new DocRetriever(octokit);
-  const detector = new DriftDetector(llm);
+  const detector = new DriftDetector(llm, scaffoldEnabled);
 
   try {
     core.info(`Fetching diff for PR #${pullNumber}...`);
@@ -68,13 +68,15 @@ async function run(): Promise<void> {
     core.info(`Fetching relevant doc files...`);
     const docs = await retriever.fetch(owner, repo, headSha, diff.files);
 
-    if (docs.length === 0) {
-      core.info("No documentation files found in this repository. Skipping analysis.");
+    if (docs.length === 0 && scaffoldEnabled) {
+      core.info("No documentation files found. Running scaffold mode to suggest starter docs...");
+    } else if (docs.length === 0) {
+      core.info("No documentation files found. Skipping analysis (scaffold-missing-docs is disabled).");
       core.setOutput("findings-count", "0");
       return;
+    } else {
+      core.info(`Analyzing ${diff.files.length} changed files against ${docs.length} doc files...`);
     }
-
-    core.info(`Analyzing ${diff.files.length} changed files against ${docs.length} doc files...`);
     const result = await detector.detect(diff.files, docs);
 
     core.info(`Found ${result.findings.length} drift findings in ${result.durationMs}ms.`);
