@@ -3,6 +3,7 @@ import * as github from "@actions/github";
 import { Octokit } from "@octokit/rest";
 import {
   AnthropicProvider,
+  OllamaProvider,
   DiffAnalyzer,
   DocRetriever,
   DriftDetector,
@@ -12,6 +13,7 @@ import {
   PRNotFoundError,
   GitHubAuthError,
 } from "@docdrift/core";
+import type { LLMProvider } from "@docdrift/core";
 
 const DOCDRIFT_COMMENT_MARKER = "<!-- docdrift-analysis -->";
 
@@ -40,12 +42,24 @@ async function run(): Promise<void> {
   const isFork = pr.head.repo?.fork === true;
 
   const token = core.getInput("github-token", { required: true });
-  const apiKey = core.getInput("anthropic-api-key", { required: true });
+  const anthropicKey = core.getInput("anthropic-api-key");
+  const ollamaKey = core.getInput("ollama-api-key");
   const modelId = core.getInput("model") || undefined;
   const scaffoldEnabled = core.getInput("scaffold-missing-docs") !== "false";
 
+  let llm: LLMProvider;
+  if (ollamaKey) {
+    llm = new OllamaProvider({ apiKey: ollamaKey, model: modelId ?? "gpt-oss" });
+    core.info(`Using Ollama provider (${modelId ?? "gpt-oss"}) via ollama.com`);
+  } else if (anthropicKey) {
+    llm = new AnthropicProvider(anthropicKey, modelId);
+    core.info(`Using Anthropic provider (${modelId ?? "claude-sonnet-4-6"})`);
+  } else {
+    core.setFailed("Either anthropic-api-key or ollama-api-key must be provided.");
+    return;
+  }
+
   const octokit = new Octokit({ auth: token });
-  const llm = new AnthropicProvider(apiKey, modelId);
 
   const analyzer = new DiffAnalyzer(octokit);
   const retriever = new DocRetriever(octokit);

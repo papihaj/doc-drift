@@ -7,8 +7,11 @@ branding:
 
 inputs:
   anthropic-api-key:
-    description: "Anthropic API key for drift detection"
-    required: true
+    description: "Anthropic API key. Required if not using ollama-api-key."
+    required: false
+  ollama-api-key:
+    description: "Ollama Cloud API key. Uses gpt-oss via ollama.com. Required if not using anthropic-api-key."
+    required: false
   github-token:
     description: "GitHub token for reading diffs and posting comments"
     required: false
