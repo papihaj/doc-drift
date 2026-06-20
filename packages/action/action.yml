@@ -1,0 +1,35 @@
+name: "DocDrift"
+description: "Detect documentation drift in pull requests"
+author: "DocDrift"
+branding:
+  icon: "file-text"
+  color: "blue"
+
+inputs:
+  anthropic-api-key:
+    description: "Anthropic API key for drift detection"
+    required: true
+  github-token:
+    description: "GitHub token for reading diffs and posting comments"
+    required: false
+    default: ${{ github.token }}
+  model:
+    description: "Anthropic model to use"
+    required: false
+    default: "claude-sonnet-4-6"
+  confidence-threshold:
+    description: "Minimum confidence score (0-1) for a finding to be reported"
+    required: false
+    default: "0.7"
+  scaffold-missing-docs:
+    description: "When no doc files exist, generate starter documentation stubs as a PR comment"
+    required: false
+    default: "true"
+
+outputs:
+  findings-count:
+    description: "Number of drift findings detected"
+
+runs:
+  using: "node20"
+  main: "dist/bundle.js"
