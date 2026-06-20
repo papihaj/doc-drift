@@ -70,7 +70,26 @@ In your repo: **Settings → Secrets and variables → Actions → New repositor
 - Name: `ANTHROPIC_API_KEY`
 - Value: your key from [console.anthropic.com](https://console.anthropic.com)
 
-### 3. Open a pull request
+### 3. Add a DocDrift section to your repo's README
+
+Paste this into your project's README so contributors and AI agents know DocDrift is active:
+
+````markdown
+## Documentation
+
+This repo uses [DocDrift](https://github.com/papihaj/doc-drift) to keep documentation in sync with code changes.
+
+**For contributors:** DocDrift runs on every PR. If your code change affects documented behavior (API signatures, config options, endpoints), update the relevant doc file in the same PR. DocDrift will flag anything you miss and suggest the exact diff to apply.
+
+**For AI coding agents:** Before generating code that calls internal APIs or uses config, read the doc files in `docs/` and `README.md` first — they reflect the current behavior. If DocDrift posted a comment on this PR, apply the suggested doc updates before marking your task complete.
+
+Doc files this repo tracks:
+- `README.md` — project overview and usage
+- `docs/` — API reference and guides
+- `openapi.yaml` — HTTP API schema (if present)
+````
+
+### 4. Open a pull request
 
 DocDrift posts a comment on every PR with findings. On a repo with no docs yet, it generates starter doc stubs instead.
 
