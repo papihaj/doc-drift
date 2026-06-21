@@ -15,7 +15,8 @@ IMPORTANT RULES:
 4. Write realistic starter content — not placeholder text like "TODO: add description".
 5. If the diff does not contain enough signal to write meaningful docs, return an empty suggestedDocs array.
 
-Use the suggest_docs tool to return your suggestions.
+Respond with a JSON object in exactly this format:
+{"suggestedDocs":[{"filename":"<path>","content":"<full markdown>","rationale":"<one-line reason>"}],"summary":"<brief summary>"}
 
 <DIFF>
 ${diffSection}
@@ -42,7 +43,8 @@ IMPORTANT RULES:
 4. Do NOT report: stylistic improvements, vague "this feels outdated" observations, or speculative changes.
 5. If you find no drift, return an empty findings array.
 
-Use the report_drift tool to return your findings.
+Respond with a JSON object in exactly this format:
+{"findings":[{"docFile":"<doc path>","codeFile":"<code path>","issue":"<one-line summary>","explanation":"<detail>","suggestedUpdate":"<diff patch>","severity":"high|medium|low","confidence":<0.0-1.0>}],"summary":"<brief summary>","checkedDocFiles":["<doc paths checked>"]}
 
 <DIFF>
 ${diffSection}

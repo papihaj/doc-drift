@@ -31920,7 +31920,8 @@ IMPORTANT RULES:
 4. Write realistic starter content \u2014 not placeholder text like "TODO: add description".
 5. If the diff does not contain enough signal to write meaningful docs, return an empty suggestedDocs array.
 
-Use the suggest_docs tool to return your suggestions.
+Respond with a JSON object in exactly this format:
+{"suggestedDocs":[{"filename":"<path>","content":"<full markdown>","rationale":"<one-line reason>"}],"summary":"<brief summary>"}
 
 <DIFF>
 ${diffSection}
@@ -31946,7 +31947,8 @@ IMPORTANT RULES:
 4. Do NOT report: stylistic improvements, vague "this feels outdated" observations, or speculative changes.
 5. If you find no drift, return an empty findings array.
 
-Use the report_drift tool to return your findings.
+Respond with a JSON object in exactly this format:
+{"findings":[{"docFile":"<doc path>","codeFile":"<code path>","issue":"<one-line summary>","explanation":"<detail>","suggestedUpdate":"<diff patch>","severity":"high|medium|low","confidence":<0.0-1.0>}],"summary":"<brief summary>","checkedDocFiles":["<doc paths checked>"]}
 
 <DIFF>
 ${diffSection}
@@ -32174,63 +32176,6 @@ function formatFinding(finding) {
 // ../core/dist/llm/ollama.js
 var LOCAL_BASE_URL = "http://localhost:11434";
 var CLOUD_BASE_URL = "https://ollama.com";
-var REPORT_DRIFT_TOOL = {
-  type: "function",
-  function: {
-    name: "report_drift",
-    description: "Report documentation drift findings for a pull request",
-    parameters: {
-      type: "object",
-      properties: {
-        findings: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              docFile: { type: "string" },
-              codeFile: { type: "string" },
-              issue: { type: "string" },
-              explanation: { type: "string" },
-              suggestedUpdate: { type: "string" },
-              severity: { type: "string", enum: ["high", "medium", "low"] },
-              confidence: { type: "number" }
-            },
-            required: ["docFile", "codeFile", "issue", "explanation", "suggestedUpdate", "severity", "confidence"]
-          }
-        },
-        summary: { type: "string" },
-        checkedDocFiles: { type: "array", items: { type: "string" } }
-      },
-      required: ["findings", "summary", "checkedDocFiles"]
-    }
-  }
-};
-var SUGGEST_DOCS_TOOL = {
-  type: "function",
-  function: {
-    name: "suggest_docs",
-    description: "Suggest initial documentation files for an undocumented codebase",
-    parameters: {
-      type: "object",
-      properties: {
-        suggestedDocs: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              filename: { type: "string" },
-              content: { type: "string" },
-              rationale: { type: "string" }
-            },
-            required: ["filename", "content", "rationale"]
-          }
-        },
-        summary: { type: "string" }
-      },
-      required: ["suggestedDocs", "summary"]
-    }
-  }
-};
 var OllamaProvider = class {
   modelId;
   baseUrl;
@@ -32242,7 +32187,7 @@ var OllamaProvider = class {
     this.modelId = model;
   }
   async analyze(prompt) {
-    const raw = await this.chat(prompt, REPORT_DRIFT_TOOL);
+    const raw = await this.chat(prompt);
     const parsed = DriftAnalysisSchema.safeParse(raw);
     if (!parsed.success) {
       throw new LLMParseError(JSON.stringify(raw), parsed.error);
@@ -32250,14 +32195,14 @@ var OllamaProvider = class {
     return parsed.data;
   }
   async scaffold(prompt) {
-    const raw = await this.chat(prompt, SUGGEST_DOCS_TOOL);
+    const raw = await this.chat(prompt);
     const parsed = ScaffoldOutputSchema.safeParse(raw);
     if (!parsed.success) {
       throw new LLMParseError(JSON.stringify(raw), parsed.error);
     }
     return parsed.data;
   }
-  async chat(prompt, tool) {
+  async chat(prompt) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
     const headers = { "Content-Type": "application/json" };
@@ -32273,7 +32218,7 @@ var OllamaProvider = class {
         body: JSON.stringify({
           model: this.modelId,
           messages: [{ role: "user", content: prompt }],
-          tools: [tool],
+          format: "json",
           stream: false
         }),
         signal: controller.signal
@@ -32297,11 +32242,15 @@ var OllamaProvider = class {
     } catch (err) {
       throw new LLMParseError("Ollama response was not valid JSON", err);
     }
-    const toolCall = data.message?.tool_calls?.[0];
-    if (!toolCall) {
-      throw new LLMEmptyResponseError(`Ollama model ${this.modelId} did not call the ${tool.function.name} tool`);
+    const content = data.message?.content;
+    if (!content) {
+      throw new LLMEmptyResponseError(`Ollama model ${this.modelId} returned empty content`);
     }
-    return toolCall.function.arguments;
+    try {
+      return JSON.parse(content);
+    } catch (err) {
+      throw new LLMParseError(`Ollama model ${this.modelId} returned non-JSON content: ${content.slice(0, 200)}`, err);
+    }
   }
 };
 
