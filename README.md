@@ -56,14 +56,40 @@ jobs:
       - uses: docdrift/docdrift@v1
         with:
           ollama-api-key: ${{ secrets.OLLAMA_API_KEY }}
+          # Optional: sync drift findings against your Confluence docs
+          # confluence-url: https://yourorg.atlassian.net/wiki
+          # confluence-email: you@yourorg.com
+          # confluence-api-token: ${{ secrets.CONFLUENCE_API_TOKEN }}
+          # confluence-space-key: TECH
 ```
 
-### 2. Add your Ollama API key
+### 2. Add your API keys
 
 In your repo: **Settings → Secrets and variables → Actions → New repository secret**
 
+**Required:**
+
 - Name: `OLLAMA_API_KEY`
 - Value: your key from [ollama.com/settings/keys](https://ollama.com/settings/keys)
+
+**Optional — Confluence sync:**
+
+- Name: `CONFLUENCE_API_TOKEN`
+- Value: generate one at [id.atlassian.com/manage/api-tokens](https://id.atlassian.com/manage/api-tokens)
+
+Then add the Confluence inputs to your workflow:
+
+```yaml
+- uses: docdrift/docdrift@v1
+  with:
+    ollama-api-key: ${{ secrets.OLLAMA_API_KEY }}
+    confluence-url: https://yourorg.atlassian.net/wiki
+    confluence-email: you@yourorg.com
+    confluence-api-token: ${{ secrets.CONFLUENCE_API_TOKEN }}
+    confluence-space-key: TECH
+```
+
+When configured, DocDrift searches your Confluence space for pages related to the changed files and includes them in drift analysis alongside your repo docs.
 
 ### 3. Add a DocDrift section to your repo's README
 
@@ -99,13 +125,13 @@ All inputs are optional except `ollama-api-key`.
 | ----------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `ollama-api-key`        | —                     | Ollama Cloud API key. Required. Get one at [ollama.com/settings/keys](https://ollama.com/settings/keys).                         |
 | `github-token`          | `${{ github.token }}` | GitHub token for reading diffs and posting comments. The default token is sufficient for most repos.                             |
-| `model`                 | `gpt-oss`             | Ollama model to use. `gpt-oss` (20B) or `gpt-oss:120b` (120B, higher quality).                                                  |
+| `model`                 | `gpt-oss`             | Ollama model to use. `gpt-oss` (20B) or `gpt-oss:120b` (120B, higher quality).                                                   |
 | `confidence-threshold`  | `0.7`                 | Minimum confidence score (0–1) for a finding to be reported. Raise this to reduce noise; lower it to catch more potential drift. |
 | `scaffold-missing-docs` | `true`                | When no doc files exist, generate starter documentation stubs as a PR comment. Set to `false` to disable.                        |
 | `confluence-url`        | —                     | Confluence base URL (e.g. `https://yourorg.atlassian.net/wiki`). When set, DocDrift also searches Confluence pages for drift.    |
 | `confluence-email`      | —                     | Atlassian account email. Required for Atlassian Cloud. Omit when using a Data Center PAT.                                        |
 | `confluence-api-token`  | —                     | Atlassian API token (Cloud) or Personal Access Token (Data Center).                                                              |
-| `confluence-space-key`  | —                     | Confluence space key to scope page search (e.g. `TECH`). Omit to search all spaces.                                             |
+| `confluence-space-key`  | —                     | Confluence space key to scope page search (e.g. `TECH`). Omit to search all spaces.                                              |
 
 ### Example with all options
 
@@ -129,10 +155,10 @@ All inputs are optional except `ollama-api-key`.
 
 DocDrift uses [gpt-oss](https://ollama.com/library/gpt-oss) via Ollama.
 
-| Variant        | Best for                          |
-| -------------- | --------------------------------- |
-| `gpt-oss`      | Default. Fast, low cost.          |
-| `gpt-oss:120b` | Higher quality on complex diffs.  |
+| Variant        | Best for                         |
+| -------------- | -------------------------------- |
+| `gpt-oss`      | Default. Fast, low cost.         |
+| `gpt-oss:120b` | Higher quality on complex diffs. |
 
 Set the `model` input to switch variants.
 
