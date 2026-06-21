@@ -55,18 +55,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: docdrift/docdrift@v1
         with:
-          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          ollama-api-key: ${{ secrets.OLLAMA_API_KEY }}
 ```
 
-### 2. Add your Anthropic API key/Ollama Key
+### 2. Add your Ollama API key
 
 In your repo: **Settings → Secrets and variables → Actions → New repository secret**
 
-- Name: `ANTHROPIC_API_KEY`
-- Value: your key from [console.anthropic.com](https://console.anthropic.com)
-
-- Name: 'OLLAMA_API_KEY'
-- Value: your key from [https://ollama.com/settings/keys](hhttps://ollama.com/settings/keys)
+- Name: `OLLAMA_API_KEY`
+- Value: your key from [ollama.com/settings/keys](https://ollama.com/settings/keys)
 
 ### 3. Add a DocDrift section to your repo's README
 
@@ -96,69 +93,48 @@ DocDrift posts a comment on every PR with findings. On a repo with no docs yet, 
 
 ## Configuration
 
-All inputs are optional except `anthropic-api-key`.
+All inputs are optional except `ollama-api-key`.
 
 | Input                   | Default               | Description                                                                                                                      |
 | ----------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `anthropic-api-key`     | —                     | Anthropic API key. Required when using the Anthropic provider.                                                                   |
+| `ollama-api-key`        | —                     | Ollama Cloud API key. Required. Get one at [ollama.com/settings/keys](https://ollama.com/settings/keys).                         |
 | `github-token`          | `${{ github.token }}` | GitHub token for reading diffs and posting comments. The default token is sufficient for most repos.                             |
-| `model`                 | `claude-sonnet-4-6`   | Model to use for analysis. Set to `gpt-oss` or `gpt-oss:120b` when using Ollama.                                                 |
+| `model`                 | `gpt-oss`             | Ollama model to use. `gpt-oss` (20B) or `gpt-oss:120b` (120B, higher quality).                                                  |
 | `confidence-threshold`  | `0.7`                 | Minimum confidence score (0–1) for a finding to be reported. Raise this to reduce noise; lower it to catch more potential drift. |
 | `scaffold-missing-docs` | `true`                | When no doc files exist, generate starter documentation stubs as a PR comment. Set to `false` to disable.                        |
+| `confluence-url`        | —                     | Confluence base URL (e.g. `https://yourorg.atlassian.net/wiki`). When set, DocDrift also searches Confluence pages for drift.    |
+| `confluence-email`      | —                     | Atlassian account email. Required for Atlassian Cloud. Omit when using a Data Center PAT.                                        |
+| `confluence-api-token`  | —                     | Atlassian API token (Cloud) or Personal Access Token (Data Center).                                                              |
+| `confluence-space-key`  | —                     | Confluence space key to scope page search (e.g. `TECH`). Omit to search all spaces.                                             |
 
 ### Example with all options
 
 ```yaml
 - uses: docdrift/docdrift@v1
   with:
-    anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
-    model: claude-sonnet-4-6
+    ollama-api-key: ${{ secrets.OLLAMA_API_KEY }}
+    model: gpt-oss
     confidence-threshold: "0.8"
     scaffold-missing-docs: "true"
+    # Optional: search Confluence pages for drift alongside repo docs
+    confluence-url: https://yourorg.atlassian.net/wiki
+    confluence-email: you@yourorg.com
+    confluence-api-token: ${{ secrets.CONFLUENCE_API_TOKEN }}
+    confluence-space-key: TECH
 ```
 
 ---
 
-## Running with Ollama (free, no Anthropic key)
+## Models
 
-DocDrift supports [gpt-oss](https://ollama.com/library/gpt-oss) via Ollama as a free alternative to the Anthropic API.
+DocDrift uses [gpt-oss](https://ollama.com/library/gpt-oss) via Ollama.
 
-### Option A: Local (runs on your machine)
+| Variant        | Best for                          |
+| -------------- | --------------------------------- |
+| `gpt-oss`      | Default. Fast, low cost.          |
+| `gpt-oss:120b` | Higher quality on complex diffs.  |
 
-```bash
-ollama pull gpt-oss        # 20B model, 14GB RAM
-ollama pull gpt-oss:120b   # 120B model, 65GB RAM
-ollama serve               # must be running before analysis starts
-```
-
-```typescript
-import { OllamaProvider, DriftDetector } from "@docdrift/core";
-
-// No key needed — talks to localhost:11434 automatically
-const llm = new OllamaProvider();
-const detector = new DriftDetector(llm);
-```
-
-### Option B: Ollama Cloud (API key, no local GPU needed)
-
-Create an API key at [ollama.com/settings/keys](https://ollama.com/settings/keys), then:
-
-```bash
-export OLLAMA_API_KEY=your_key_here
-```
-
-```typescript
-import { OllamaProvider, DriftDetector } from "@docdrift/core";
-
-// Reads OLLAMA_API_KEY from env, routes to https://ollama.com/api automatically
-const llm = new OllamaProvider({ model: "gpt-oss:120b" });
-const detector = new DriftDetector(llm);
-```
-
-| Variant                   | RAM needed | Best for                      |
-| ------------------------- | ---------- | ----------------------------- |
-| `gpt-oss` / `gpt-oss:20b` | 16GB       | Local development             |
-| `gpt-oss:120b`            | 80GB       | Cloud or high-memory machines |
+Set the `model` input to switch variants.
 
 ---
 
@@ -175,13 +151,22 @@ It does **not** report vague suggestions, stylistic improvements, or speculative
 
 ### Doc files DocDrift reads
 
+DocDrift scans the repo tree for any file matching these patterns:
+
 ```
-README.md / README.*
-docs/**/*.md
-openapi.yaml / openapi.json / swagger.yaml / swagger.json
-CHANGELOG.*
-CONTRIBUTING.*
+README.*
+docs/**/*.md, docs/**/*.mdx
+pages/**/*.md, pages/**/*.mdx          (Next.js / Nextra)
+website/docs/**/*.md, site/docs/**/*   (Docusaurus)
+content/**/*.md, content/**/*.mdx      (Astro, Hugo)
+wiki/**/*.md
+src/**/*.md                            (inline docs alongside code)
+openapi.yaml/json, swagger.yaml/json
+CHANGELOG.*, CONTRIBUTING.*
+ARCHITECTURE.*, DESIGN.*, API.*, GUIDE.*, INSTALL.*, SETUP.*, USAGE.*
 ```
+
+When `confluence-url` is configured, DocDrift also **searches your Confluence space** for pages related to the changed files and includes them in the analysis. Findings that reference a Confluence page will show `confluence:Page Title` as the source so you know exactly which page to update.
 
 ---
 
@@ -206,7 +191,7 @@ The `role` parameter is now required but the docs still show the old signature.
 ` ` `
 
 ---
-_Analyzed in 4.2s · 2 doc files checked · claude-sonnet-4-6_
+_Analyzed in 4.2s · 2 doc files checked · gpt-oss_
 ````
 
 **When no docs exist (scaffold mode):**
@@ -301,12 +286,12 @@ import {
   DiffAnalyzer,
   DocRetriever,
   DriftDetector,
-  AnthropicProvider, // or OllamaProvider
+  OllamaProvider,
   buildPRComment,
 } from "@docdrift/core";
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
-const llm = new AnthropicProvider(process.env.ANTHROPIC_API_KEY!);
+const llm = new OllamaProvider({ model: "gpt-oss" }); // reads OLLAMA_API_KEY from env
 
 // scaffoldEnabled=true (default): generates doc stubs when no docs found
 const detector = new DriftDetector(llm, true);
@@ -371,14 +356,9 @@ if (result.scaffoldSuggestions) {
 }
 ```
 
-### LLM providers
+### LLM provider
 
-| Provider            | Import                                              | When to use                                                 |
-| ------------------- | --------------------------------------------------- | ----------------------------------------------------------- |
-| `AnthropicProvider` | `new AnthropicProvider(apiKey, modelId?)`           | Default. Highest quality. Requires `ANTHROPIC_API_KEY`.     |
-| `OllamaProvider`    | `new OllamaProvider({ model?, baseUrl?, apiKey? })` | Free local (no key) or Ollama Cloud (set `OLLAMA_API_KEY`). |
-
-Both implement the same `LLMProvider` interface and are interchangeable. You can inject a mock for testing:
+DocDrift uses `OllamaProvider` (gpt-oss). You can inject a mock for testing:
 
 ```typescript
 import type { LLMProvider } from "@docdrift/core";
@@ -436,21 +416,13 @@ If your diff only contains CI, test, or config files, `result.scaffoldSuggestion
 ## Using `@docdrift/core` directly (quick reference)
 
 ```typescript
-import {
-  DriftDetector,
-  AnthropicProvider,
-  OllamaProvider,
-  buildPRComment,
-} from "@docdrift/core";
+import { DriftDetector, OllamaProvider, buildPRComment } from "@docdrift/core";
 
-// Anthropic (cloud)
-const llm = new AnthropicProvider(process.env.ANTHROPIC_API_KEY!);
-
-// Ollama local
+// Local (no key needed — talks to localhost:11434)
 const llm = new OllamaProvider();
 
-// Ollama cloud
-const llm = new OllamaProvider({ model: "gpt-oss:120b" }); // reads OLLAMA_API_KEY from env
+// Ollama Cloud (reads OLLAMA_API_KEY from env)
+const llm = new OllamaProvider({ model: "gpt-oss:120b" });
 
 const detector = new DriftDetector(llm); // scaffoldEnabled defaults to true
 const result = await detector.detect(diffFiles, docFiles);

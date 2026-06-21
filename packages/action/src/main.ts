@@ -2,10 +2,10 @@ import * as core from "@actions/core";
 import * as github from "@actions/github";
 import { Octokit } from "@octokit/rest";
 import {
-  AnthropicProvider,
   OllamaProvider,
   DiffAnalyzer,
   DocRetriever,
+  ConfluenceRetriever,
   DriftDetector,
   buildPRComment,
   LLMProviderError,
@@ -13,7 +13,6 @@ import {
   PRNotFoundError,
   GitHubAuthError,
 } from "@docdrift/core";
-import type { LLMProvider } from "@docdrift/core";
 
 const DOCDRIFT_COMMENT_MARKER = "<!-- docdrift-analysis -->";
 
@@ -42,30 +41,30 @@ async function run(): Promise<void> {
   const isFork = pr.head.repo?.fork === true;
 
   const token = core.getInput("github-token", { required: true });
-  const anthropicKey = core.getInput("anthropic-api-key");
   const ollamaKey = core.getInput("ollama-api-key");
-  const modelId = core.getInput("model") || undefined;
+  const modelId = core.getInput("model") || "gpt-oss";
   const scaffoldEnabled = core.getInput("scaffold-missing-docs") !== "false";
   const confluenceUrl = core.getInput("confluence-url") || undefined;
+  const confluenceEmail = core.getInput("confluence-email") || undefined;
   const confluenceToken = core.getInput("confluence-api-token") || undefined;
+  const confluenceSpaceKey = core.getInput("confluence-space-key") || undefined;
   const confluenceConfigured = !!(confluenceUrl && confluenceToken);
 
-  let llm: LLMProvider;
-  if (ollamaKey) {
-    llm = new OllamaProvider({ apiKey: ollamaKey, model: modelId ?? "gpt-oss" });
-    core.info(`Using Ollama provider (${modelId ?? "gpt-oss"}) via ollama.com`);
-  } else if (anthropicKey) {
-    llm = new AnthropicProvider(anthropicKey, modelId);
-    core.info(`Using Anthropic provider (${modelId ?? "claude-sonnet-4-6"})`);
-  } else {
-    core.setFailed("Either anthropic-api-key or ollama-api-key must be provided.");
+  if (!ollamaKey) {
+    core.setFailed("ollama-api-key is required.");
     return;
   }
+
+  const llm = new OllamaProvider({ apiKey: ollamaKey, model: modelId });
+  core.info(`Using Ollama (${modelId}) via ollama.com`);
 
   const octokit = new Octokit({ auth: token });
 
   const analyzer = new DiffAnalyzer(octokit);
   const retriever = new DocRetriever(octokit);
+  const confluenceRetriever = confluenceConfigured
+    ? new ConfluenceRetriever({ baseUrl: confluenceUrl!, apiToken: confluenceToken!, email: confluenceEmail, spaceKey: confluenceSpaceKey })
+    : null;
   const detector = new DriftDetector(llm, scaffoldEnabled);
 
   try {
@@ -83,7 +82,16 @@ async function run(): Promise<void> {
     }
 
     core.info(`Fetching relevant doc files...`);
-    const docs = await retriever.fetch(owner, repo, headSha, diff.files);
+    const [repoDocs, confluenceDocs] = await Promise.all([
+      retriever.fetch(owner, repo, headSha, diff.files),
+      confluenceRetriever ? confluenceRetriever.fetch(diff.files) : Promise.resolve([]),
+    ]);
+
+    if (confluenceDocs.length > 0) {
+      core.info(`Fetched ${confluenceDocs.length} Confluence page(s) matching changed files.`);
+    }
+
+    const docs = [...repoDocs, ...confluenceDocs];
 
     if (docs.length === 0 && scaffoldEnabled) {
       core.info("No documentation files found. Running scaffold mode to suggest starter docs...");

@@ -5,6 +5,8 @@ export type { DiffChunk } from "./diff/chunker.js";
 
 export { DocRetriever } from "./docs/retriever.js";
 export type { DocFile } from "./docs/retriever.js";
+export { ConfluenceRetriever } from "./docs/confluence.js";
+export type { ConfluenceConfig } from "./docs/confluence.js";
 
 export { DriftDetector } from "./drift/detector.js";
 export type { DetectionResult } from "./drift/detector.js";

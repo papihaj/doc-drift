@@ -5,11 +5,18 @@ import type { DiffFile } from "../diff/analyzer.js";
 
 const DOC_PATTERNS = [
   /^README(\.\w+)?$/i,
-  /^docs?\/.+\.md$/i,
+  /^docs?\/.+\.mdx?$/i,
   /^\.?openapi\.(ya?ml|json)$/i,
   /^swagger\.(ya?ml|json)$/i,
   /^CHANGELOG(\.\w+)?$/i,
   /^CONTRIBUTING(\.\w+)?$/i,
+  // additional common doc locations
+  /^pages\/.+\.mdx?$/i,
+  /^(website|site)\/docs?\/.+\.mdx?$/i,
+  /^content\/.+\.mdx?$/i,
+  /^wiki\/.+\.md$/i,
+  /^src\/.+\.md$/i,
+  /^(ARCHITECTURE|DESIGN|API|GUIDE|INSTALL|SETUP|USAGE)(\.\w+)?$/i,
 ];
 
 const MAX_DOC_FILE_BYTES = 200 * 1024;
