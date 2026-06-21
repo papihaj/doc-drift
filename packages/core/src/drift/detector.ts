@@ -20,7 +20,9 @@ const NO_SCAFFOLD_PATTERNS = [
   /\/__tests__\//,
   /\/fixtures\//,
   /^(\.eslintrc|\.prettierrc|\.editorconfig|tsconfig|jest\.config|vitest\.config|vite\.config)/,
-  /\.(json|lock|yaml|yml|toml)$/,
+  /\.(lock|toml)$/,
+  /^(package|package-lock|pnpm-lock|yarn\.lock|composer\.lock)\.json$/,
+  /^(tsconfig|jsconfig|\.eslintrc|\.prettierrc|babel\.config|rollup\.config|webpack\.config)\.json$/,
 ];
 
 export interface DetectionResult {
