@@ -6,13 +6,13 @@ export type Severity = z.infer<typeof SeveritySchema>;
 export const ScaffoldSuggestionSchema = z.object({
   filename: z.string().min(1),
   content: z.string().min(1).max(16000),
-  rationale: z.string().min(1).max(500),
+  rationale: z.string().min(1).max(2000),
 });
 export type ScaffoldSuggestion = z.infer<typeof ScaffoldSuggestionSchema>;
 
 export const ScaffoldOutputSchema = z.object({
   suggestedDocs: z.array(ScaffoldSuggestionSchema),
-  summary: z.string().max(500),
+  summary: z.string().max(2000).default(""),
 });
 export type ScaffoldOutput = z.infer<typeof ScaffoldOutputSchema>;
 

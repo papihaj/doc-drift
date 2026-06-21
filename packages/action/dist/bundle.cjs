@@ -38029,11 +38029,11 @@ var SeveritySchema = external_exports.enum(["high", "medium", "low"]);
 var ScaffoldSuggestionSchema = external_exports.object({
   filename: external_exports.string().min(1),
   content: external_exports.string().min(1).max(16e3),
-  rationale: external_exports.string().min(1).max(500)
+  rationale: external_exports.string().min(1).max(2e3)
 });
 var ScaffoldOutputSchema = external_exports.object({
   suggestedDocs: external_exports.array(ScaffoldSuggestionSchema),
-  summary: external_exports.string().max(500)
+  summary: external_exports.string().max(2e3).default("")
 });
 var FindingSchema = external_exports.object({
   docFile: external_exports.string().min(1),
@@ -42474,7 +42474,8 @@ async function run() {
       try {
         confluenceSuggestions = await detector.scaffoldConfluence(diff.files, result.findings);
       } catch (err) {
-        core.warning(`Could not generate Confluence page suggestions: ${err instanceof Error ? err.message : String(err)}`);
+        const detail = err instanceof LLMParseError ? err.raw : err instanceof Error ? err.message : String(err);
+        core.warning(`Could not generate Confluence page suggestions: ${detail}`);
       }
     }
     const isFirstRun = await checkIsFirstRun(octokit, owner, repo, pullNumber);

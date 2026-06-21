@@ -10,6 +10,7 @@ import {
   buildPRComment,
   LLMProviderError,
   LLMTimeoutError,
+  LLMParseError,
   PRNotFoundError,
   GitHubAuthError,
 } from "@docdrift/core";
@@ -115,7 +116,10 @@ async function run(): Promise<void> {
       try {
         confluenceSuggestions = await detector.scaffoldConfluence(diff.files, result.findings);
       } catch (err) {
-        core.warning(`Could not generate Confluence page suggestions: ${err instanceof Error ? err.message : String(err)}`);
+        const detail = err instanceof LLMParseError
+          ? err.raw
+          : err instanceof Error ? err.message : String(err);
+        core.warning(`Could not generate Confluence page suggestions: ${detail}`);
       }
     }
 
