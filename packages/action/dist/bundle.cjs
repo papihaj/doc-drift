@@ -32069,6 +32069,9 @@ function buildPRComment(result, isFirstRun, confluence) {
 `);
   if (result.scaffoldSuggestions !== void 0) {
     parts.push(...buildScaffoldSection(result.scaffoldSuggestions));
+    if (confluence?.confluenceEmpty) {
+      parts.push(buildConfluenceEmptyNote(confluence, result.scaffoldSuggestions.map((s) => s.filename)));
+    }
     const durationSec2 = (result.durationMs / 1e3).toFixed(1);
     parts.push(`
 ---
@@ -32078,6 +32081,9 @@ _Analyzed in ${durationSec2}s \xB7 ${result.modelId}_`);
   if (result.findings.length === 0) {
     parts.push(`\u2705 **No drift detected.** DocDrift checked ${result.checkedDocFiles.length} doc file${result.checkedDocFiles.length !== 1 ? "s" : ""} \u2014 all up to date.
 `);
+    if (confluence?.confluenceEmpty) {
+      parts.push(buildConfluenceEmptyNote(confluence, result.checkedDocFiles));
+    }
   } else {
     const high = result.findings.filter((f) => f.severity === "high").length;
     const medium = result.findings.filter((f) => f.severity === "medium").length;
@@ -32092,12 +32098,26 @@ _Analyzed in ${durationSec2}s \xB7 ${result.modelId}_`);
     for (const finding of result.findings) {
       parts.push(formatFinding(finding));
     }
+    if (confluence?.confluenceEmpty) {
+      parts.push(buildConfluenceEmptyNote(confluence, [...new Set(result.findings.map((f) => f.docFile))]));
+    }
   }
   const durationSec = (result.durationMs / 1e3).toFixed(1);
   parts.push(`
 ---
 _Analyzed in ${durationSec}s \xB7 ${result.checkedDocFiles.length} doc file${result.checkedDocFiles.length !== 1 ? "s" : ""} checked \xB7 ${result.modelId}_`);
   return parts.join("\n");
+}
+function buildConfluenceEmptyNote(confluence, relatedFiles) {
+  const spaceLabel = confluence.confluenceSpaceKey ? ` \`${confluence.confluenceSpaceKey}\`` : "";
+  const fileList = relatedFiles.slice(0, 5).map((f) => `- \`${f}\``).join("\n");
+  return [
+    ``,
+    `> **No Confluence pages found** for these changes in space${spaceLabel}. Consider adding pages covering:`,
+    fileList,
+    `>`,
+    `> You can create them at ${confluence.confluenceUrl ?? "your Confluence space"}.`
+  ].join("\n");
 }
 function buildConfluenceOnboardingNote(confluence) {
   if (!confluence) {
@@ -32312,9 +32332,10 @@ async function run() {
     const result = await detector.detect(diff.files, docs);
     core.info(`Found ${result.findings.length} drift findings in ${result.durationMs}ms.`);
     core.setOutput("findings-count", String(result.findings.length));
+    const confluenceEmpty = confluenceConfigured && confluenceDocs.length === 0;
     const isFirstRun = await checkIsFirstRun(octokit, owner, repo, pullNumber);
     const comment = `${DOCDRIFT_COMMENT_MARKER}
-${buildPRComment(result, isFirstRun, { confluenceConfigured, confluenceUrl })}`;
+${buildPRComment(result, isFirstRun, { confluenceConfigured, confluenceUrl, confluenceSpaceKey, confluenceEmpty })}`;
     if (isFork) {
       core.info("PR is from a fork \u2014 skipping comment (insufficient permissions). Findings logged above.");
       core.info(comment);

@@ -107,8 +107,9 @@ async function run(): Promise<void> {
     core.info(`Found ${result.findings.length} drift findings in ${result.durationMs}ms.`);
     core.setOutput("findings-count", String(result.findings.length));
 
+    const confluenceEmpty = confluenceConfigured && confluenceDocs.length === 0;
     const isFirstRun = await checkIsFirstRun(octokit, owner, repo, pullNumber);
-    const comment = `${DOCDRIFT_COMMENT_MARKER}\n${buildPRComment(result, isFirstRun, { confluenceConfigured, confluenceUrl })}`;
+    const comment = `${DOCDRIFT_COMMENT_MARKER}\n${buildPRComment(result, isFirstRun, { confluenceConfigured, confluenceUrl, confluenceSpaceKey, confluenceEmpty })}`;
 
     if (isFork) {
       core.info("PR is from a fork — skipping comment (insufficient permissions). Findings logged above.");

@@ -10,6 +10,8 @@ const SEVERITY_EMOJI: Record<Finding["severity"], string> = {
 export interface ConfluenceOptions {
   confluenceConfigured: boolean;
   confluenceUrl?: string;
+  confluenceSpaceKey?: string;
+  confluenceEmpty?: boolean;
 }
 
 export function buildPRComment(result: DetectionResult, isFirstRun: boolean, confluence?: ConfluenceOptions): string {
@@ -26,6 +28,9 @@ export function buildPRComment(result: DetectionResult, isFirstRun: boolean, con
 
   if (result.scaffoldSuggestions !== undefined) {
     parts.push(...buildScaffoldSection(result.scaffoldSuggestions));
+    if (confluence?.confluenceEmpty) {
+      parts.push(buildConfluenceEmptyNote(confluence, result.scaffoldSuggestions.map((s) => s.filename)));
+    }
     const durationSec = (result.durationMs / 1000).toFixed(1);
     parts.push(`\n---\n_Analyzed in ${durationSec}s · ${result.modelId}_`);
     return parts.join("\n");
@@ -35,6 +40,9 @@ export function buildPRComment(result: DetectionResult, isFirstRun: boolean, con
     parts.push(
       `✅ **No drift detected.** DocDrift checked ${result.checkedDocFiles.length} doc file${result.checkedDocFiles.length !== 1 ? "s" : ""} — all up to date.\n`,
     );
+    if (confluence?.confluenceEmpty) {
+      parts.push(buildConfluenceEmptyNote(confluence, result.checkedDocFiles));
+    }
   } else {
     const high = result.findings.filter((f) => f.severity === "high").length;
     const medium = result.findings.filter((f) => f.severity === "medium").length;
@@ -53,6 +61,10 @@ export function buildPRComment(result: DetectionResult, isFirstRun: boolean, con
     for (const finding of result.findings) {
       parts.push(formatFinding(finding));
     }
+
+    if (confluence?.confluenceEmpty) {
+      parts.push(buildConfluenceEmptyNote(confluence, [...new Set(result.findings.map((f) => f.docFile))]));
+    }
   }
 
   const durationSec = (result.durationMs / 1000).toFixed(1);
@@ -61,6 +73,18 @@ export function buildPRComment(result: DetectionResult, isFirstRun: boolean, con
   );
 
   return parts.join("\n");
+}
+
+function buildConfluenceEmptyNote(confluence: ConfluenceOptions, relatedFiles: string[]): string {
+  const spaceLabel = confluence.confluenceSpaceKey ? ` \`${confluence.confluenceSpaceKey}\`` : "";
+  const fileList = relatedFiles.slice(0, 5).map((f) => `- \`${f}\``).join("\n");
+  return [
+    ``,
+    `> **No Confluence pages found** for these changes in space${spaceLabel}. Consider adding pages covering:`,
+    fileList,
+    `>`,
+    `> You can create them at ${confluence.confluenceUrl ?? "your Confluence space"}.`,
+  ].join("\n");
 }
 
 function buildConfluenceOnboardingNote(confluence?: ConfluenceOptions): string {
