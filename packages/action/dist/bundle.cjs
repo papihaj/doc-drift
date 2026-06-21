@@ -38038,16 +38038,16 @@ var ScaffoldOutputSchema = external_exports.object({
 var FindingSchema = external_exports.object({
   docFile: external_exports.string().min(1),
   codeFile: external_exports.string().min(1),
-  issue: external_exports.string().min(1).max(500),
-  explanation: external_exports.string().min(1).max(2e3),
-  suggestedUpdate: external_exports.string().min(1).max(3e3),
+  issue: external_exports.string().min(1).max(1e3),
+  explanation: external_exports.string().min(1).max(4e3),
+  suggestedUpdate: external_exports.string().max(4e3).default(""),
   severity: SeveritySchema,
   confidence: external_exports.number().min(0).max(1)
 });
 var DriftAnalysisSchema = external_exports.object({
   findings: external_exports.array(FindingSchema),
-  summary: external_exports.string().max(500),
-  checkedDocFiles: external_exports.array(external_exports.string())
+  summary: external_exports.string().max(2e3).default(""),
+  checkedDocFiles: external_exports.array(external_exports.string()).default([])
 });
 var CONFIDENCE_THRESHOLD = 0.7;
 var MAX_FINDINGS_PER_PR = 10;
@@ -42315,7 +42315,7 @@ var AnthropicProvider = class {
       raw = JSON.stringify(toolUse.input);
       const parsed = DriftAnalysisSchema.safeParse(toolUse.input);
       if (!parsed.success) {
-        throw new LLMParseError(raw, parsed.error);
+        throw new LLMParseError(`Schema validation failed: ${JSON.stringify(parsed.error.flatten())} \u2014 raw: ${raw.slice(0, 500)}`, parsed.error);
       }
       return parsed.data;
     } catch (err) {
@@ -42375,7 +42375,7 @@ var AnthropicProvider = class {
       raw = JSON.stringify(toolUse.input);
       const parsed = ScaffoldOutputSchema.safeParse(toolUse.input);
       if (!parsed.success) {
-        throw new LLMParseError(raw, parsed.error);
+        throw new LLMParseError(`Schema validation failed: ${JSON.stringify(parsed.error.flatten())} \u2014 raw: ${raw.slice(0, 500)}`, parsed.error);
       }
       return parsed.data;
     } catch (err) {

@@ -76,7 +76,7 @@ export class AnthropicProvider implements LLMProvider {
       raw = JSON.stringify(toolUse.input);
       const parsed = DriftAnalysisSchema.safeParse(toolUse.input);
       if (!parsed.success) {
-        throw new LLMParseError(raw, parsed.error);
+        throw new LLMParseError(`Schema validation failed: ${JSON.stringify(parsed.error.flatten())} — raw: ${raw.slice(0, 500)}`, parsed.error);
       }
 
       return parsed.data;
@@ -143,7 +143,7 @@ export class AnthropicProvider implements LLMProvider {
       raw = JSON.stringify(toolUse.input);
       const parsed = ScaffoldOutputSchema.safeParse(toolUse.input);
       if (!parsed.success) {
-        throw new LLMParseError(raw, parsed.error);
+        throw new LLMParseError(`Schema validation failed: ${JSON.stringify(parsed.error.flatten())} — raw: ${raw.slice(0, 500)}`, parsed.error);
       }
 
       return parsed.data;

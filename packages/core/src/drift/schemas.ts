@@ -19,9 +19,9 @@ export type ScaffoldOutput = z.infer<typeof ScaffoldOutputSchema>;
 export const FindingSchema = z.object({
   docFile: z.string().min(1),
   codeFile: z.string().min(1),
-  issue: z.string().min(1).max(500),
-  explanation: z.string().min(1).max(2000),
-  suggestedUpdate: z.string().min(1).max(3000),
+  issue: z.string().min(1).max(1000),
+  explanation: z.string().min(1).max(4000),
+  suggestedUpdate: z.string().max(4000).default(""),
   severity: SeveritySchema,
   confidence: z.number().min(0).max(1),
 });
@@ -29,8 +29,8 @@ export type Finding = z.infer<typeof FindingSchema>;
 
 export const DriftAnalysisSchema = z.object({
   findings: z.array(FindingSchema),
-  summary: z.string().max(500),
-  checkedDocFiles: z.array(z.string()),
+  summary: z.string().max(2000).default(""),
+  checkedDocFiles: z.array(z.string()).default([]),
 });
 export type DriftAnalysis = z.infer<typeof DriftAnalysisSchema>;
 
