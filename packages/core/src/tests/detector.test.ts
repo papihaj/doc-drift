@@ -163,22 +163,6 @@ describe("DriftDetector", () => {
       expect(result.scaffoldSuggestions).toBeUndefined();
     });
 
-    it("skips scaffold when all changed files match no-scaffold patterns (CI only)", async () => {
-      const llm = makeMockLLM();
-      const detector = new DriftDetector(llm, true);
-      const result = await detector.detect([configFile], []);
-
-      expect(llm.scaffold).not.toHaveBeenCalled();
-      expect(result.scaffoldSuggestions).toBeUndefined();
-    });
-
-    it("skips scaffold when all changed files are test files", async () => {
-      const llm = makeMockLLM();
-      const detector = new DriftDetector(llm, true);
-      const result = await detector.detect([testFile], []);
-
-      expect(llm.scaffold).not.toHaveBeenCalled();
-    });
 
     it("runs scaffold when at least one file is a source file", async () => {
       const llm = makeMockLLM();

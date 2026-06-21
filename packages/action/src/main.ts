@@ -11,14 +11,12 @@ import {
   buildPRComment,
   buildTemplatePrompt,
   classifyChange,
-  TEMPLATES,
   LLMProviderError,
   LLMTimeoutError,
   LLMParseError,
   PRNotFoundError,
   GitHubAuthError,
 } from "@docdrift/core";
-import type { TemplateType } from "@docdrift/core";
 
 const DOCDRIFT_COMMENT_MARKER = "<!-- docdrift-analysis -->";
 
@@ -123,8 +121,8 @@ async function run(): Promise<void> {
     core.setOutput("findings-count", String(result.findings.length));
 
     const confluenceEmpty = confluenceConfigured && confluenceDocs.length === 0;
-    if (confluenceConfigured && !confluenceEmpty) {
-      core.info(`Confluence: found ${confluenceDocs.length} existing page(s) — skipping auto-create.`);
+    if (confluenceConfigured && confluenceDocs.length > 0) {
+      core.info(`Confluence: found ${confluenceDocs.length} existing page(s) — will update if templates match.`);
     }
     if (!confluenceConfigured) {
       core.info("Confluence: not configured. Skipping page creation.");
@@ -134,7 +132,7 @@ async function run(): Promise<void> {
     let dryRunPages: { title: string; content: string }[] = [];
     let confluenceSuggestions = result.scaffoldSuggestions;
 
-    if (confluenceEmpty && selectedTemplates.length > 0) {
+    if (confluenceConfigured && selectedTemplates.length > 0) {
       if (!confluenceSpaceKey) {
         core.warning("confluence-space-key is required to create pages. Add it to your workflow.");
       } else {
@@ -145,7 +143,6 @@ async function run(): Promise<void> {
           try {
             const prompt = buildTemplatePrompt(templateType, diff.files, result.findings);
             const output = await llm.scaffold(prompt);
-            const template = TEMPLATES[templateType];
 
             for (const suggestion of output.suggestedDocs) {
               if (confluencePreview) {
@@ -169,7 +166,7 @@ async function run(): Promise<void> {
           core.info(`Confluence: ${createdPages.length} page(s) created/updated.`);
         }
       }
-    } else if (confluenceEmpty && selectedTemplates.length === 0) {
+    } else if (confluenceConfigured && selectedTemplates.length === 0) {
       core.info("Confluence: no templates selected for this PR (fix/patch branch). No pages created.");
     }
 

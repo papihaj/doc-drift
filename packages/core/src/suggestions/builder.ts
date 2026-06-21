@@ -34,8 +34,8 @@ export function buildPRComment(result: DetectionResult, isFirstRun: boolean, con
 
   if (result.scaffoldSuggestions !== undefined) {
     parts.push(...buildScaffoldSection(result.scaffoldSuggestions));
-    if (confluence?.confluenceEmpty) {
-      parts.push(buildConfluenceEmptyNote(confluence));
+    if (shouldShowConfluenceSection(confluence)) {
+      parts.push(buildConfluenceSection(confluence!));
     }
     const durationSec = (result.durationMs / 1000).toFixed(1);
     parts.push(`\n---\n_Analyzed in ${durationSec}s · ${result.modelId}_`);
@@ -46,8 +46,8 @@ export function buildPRComment(result: DetectionResult, isFirstRun: boolean, con
     parts.push(
       `✅ **No drift detected.** DocDrift checked ${result.checkedDocFiles.length} doc file${result.checkedDocFiles.length !== 1 ? "s" : ""} — all up to date.\n`,
     );
-    if (confluence?.confluenceEmpty) {
-      parts.push(buildConfluenceEmptyNote(confluence));
+    if (shouldShowConfluenceSection(confluence)) {
+      parts.push(buildConfluenceSection(confluence!));
     }
   } else {
     const high = result.findings.filter((f) => f.severity === "high").length;
@@ -68,8 +68,8 @@ export function buildPRComment(result: DetectionResult, isFirstRun: boolean, con
       parts.push(formatFinding(finding));
     }
 
-    if (confluence?.confluenceEmpty) {
-      parts.push(buildConfluenceEmptyNote(confluence));
+    if (shouldShowConfluenceSection(confluence)) {
+      parts.push(buildConfluenceSection(confluence!));
     }
   }
 
@@ -81,7 +81,15 @@ export function buildPRComment(result: DetectionResult, isFirstRun: boolean, con
   return parts.join("\n");
 }
 
-function buildConfluenceEmptyNote(confluence: ConfluenceOptions): string {
+function shouldShowConfluenceSection(confluence?: ConfluenceOptions): boolean {
+  if (!confluence) return false;
+  if (confluence.createdPages?.length) return true;
+  if (confluence.dryRunPages?.length) return true;
+  if (confluence.plannedTemplates?.length) return true;
+  return !!confluence.confluenceEmpty;
+}
+
+function buildConfluenceSection(confluence: ConfluenceOptions): string {
   const spaceLabel = confluence.confluenceSpaceKey ? ` \`${confluence.confluenceSpaceKey}\`` : "";
   const spaceUrl = confluence.confluenceUrl ?? "your Confluence space";
 
