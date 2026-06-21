@@ -42665,12 +42665,22 @@ async function run() {
     core.info(`Found ${result.findings.length} drift findings in ${result.durationMs}ms.`);
     core.setOutput("findings-count", String(result.findings.length));
     const confluenceEmpty = confluenceConfigured && confluenceDocs.length === 0;
+    if (confluenceConfigured && !confluenceEmpty) {
+      core.info(`Confluence: found ${confluenceDocs.length} existing page(s) \u2014 skipping auto-create.`);
+    }
+    if (!confluenceConfigured) {
+      core.info("Confluence: not configured (no confluence-url / confluence-api-token). Skipping.");
+    }
     let confluenceSuggestions;
     let createdPages = [];
     if (confluenceEmpty) {
-      core.info("No Confluence pages found \u2014 generating and creating pages...");
+      core.info("Confluence: no existing pages found \u2014 generating content and creating pages...");
+      if (!confluenceSpaceKey) {
+        core.warning("confluence-space-key is not set. Pages cannot be created without a space key. Add confluence-space-key to your workflow inputs.");
+      }
       try {
         confluenceSuggestions = await detector.scaffoldConfluence(diff.files, result.findings);
+        core.info(`Confluence: scaffold generated ${confluenceSuggestions?.length ?? 0} page suggestion(s).`);
         if (confluenceSuggestions && confluenceSuggestions.length > 0 && confluenceSpaceKey) {
           const writer = new ConfluenceWriter({
             baseUrl: confluenceUrl,
@@ -42687,19 +42697,18 @@ async function run() {
                 confluenceParentPageId
               );
               createdPages.push({ title: page.title, url: page.url });
-              core.info(`Created Confluence page: ${page.title} \u2014 ${page.url}`);
+              core.info(`Confluence: created page "${page.title}" \u2014 ${page.url}`);
             } catch (pageErr) {
               core.warning(
-                `Failed to create page "${suggestion.filename}": ${pageErr instanceof Error ? pageErr.message : String(pageErr)}`
+                `Confluence: failed to create page "${suggestion.filename}": ${pageErr instanceof Error ? pageErr.message : String(pageErr)}`
               );
             }
           }
-        } else if (confluenceSuggestions && confluenceSuggestions.length > 0 && !confluenceSpaceKey) {
-          core.warning("confluence-space-key is required to auto-create pages. Suggestions will appear in PR comment only.");
+          core.info(`Confluence: ${createdPages.length}/${confluenceSuggestions.length} pages created successfully.`);
         }
       } catch (err) {
         const detail = err instanceof LLMParseError ? err.raw : err instanceof Error ? err.message : String(err);
-        core.warning(`Could not generate Confluence page suggestions: ${detail}`);
+        core.warning(`Confluence: could not generate page suggestions: ${detail}`);
       }
     }
     const isFirstRun = await checkIsFirstRun(octokit, owner, repo, pullNumber);

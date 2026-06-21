@@ -35,7 +35,10 @@ inputs:
     description: "Atlassian API token (Cloud) or Personal Access Token (Data Center)."
     required: false
   confluence-space-key:
-    description: "Confluence space key to scope page search (e.g. TECH). Omit to search all spaces."
+    description: "Confluence space key to scope page search and auto-create pages (e.g. TECH). Required for Confluence page auto-creation."
+    required: false
+  confluence-parent-page-id:
+    description: "Confluence page ID to nest auto-created pages under. Optional."
     required: false
 
 outputs:
