@@ -96,9 +96,16 @@ describe("buildConfluenceScaffoldPrompt", () => {
     expect(prompt.toLowerCase()).toMatch(/untrusted|never follow.*instructions/i);
   });
 
-  it("asks for section headings only, not full page content", () => {
+  it("instructs model to always include Architecture Overview as first page", () => {
     const prompt = buildConfluenceScaffoldPrompt(sampleDiff, []);
-    expect(prompt).toContain("section headings");
+    expect(prompt.toLowerCase()).toContain("architecture overview");
+    expect(prompt.toLowerCase()).toContain("first");
+  });
+
+  it("instructs model to use Stripe-style structured content (tables, field defs)", () => {
+    const prompt = buildConfluenceScaffoldPrompt(sampleDiff, []);
+    expect(prompt).toContain("markdown table");
+    expect(prompt).toContain("field definition");
     expect(prompt).not.toContain("600 words");
     expect(prompt).not.toContain("complete page");
   });
