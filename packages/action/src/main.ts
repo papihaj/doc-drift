@@ -42,7 +42,7 @@ async function run(): Promise<void> {
 
   const token = core.getInput("github-token", { required: true });
   const ollamaKey = core.getInput("ollama-api-key");
-  const modelId = core.getInput("model") || "gpt-oss";
+  const modelId = core.getInput("model") || "gpt-oss:20b";
   const scaffoldEnabled = core.getInput("scaffold-missing-docs") !== "false";
   const confluenceUrl = core.getInput("confluence-url") || undefined;
   const confluenceEmail = core.getInput("confluence-email") || undefined;

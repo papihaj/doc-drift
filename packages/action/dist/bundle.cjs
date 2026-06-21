@@ -32330,7 +32330,7 @@ async function run() {
   const isFork = pr.head.repo?.fork === true;
   const token = core.getInput("github-token", { required: true });
   const ollamaKey = core.getInput("ollama-api-key");
-  const modelId = core.getInput("model") || "gpt-oss";
+  const modelId = core.getInput("model") || "gpt-oss:20b";
   const scaffoldEnabled = core.getInput("scaffold-missing-docs") !== "false";
   const confluenceUrl = core.getInput("confluence-url") || void 0;
   const confluenceEmail = core.getInput("confluence-email") || void 0;
