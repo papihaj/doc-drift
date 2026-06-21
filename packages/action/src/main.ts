@@ -2,7 +2,7 @@ import * as core from "@actions/core";
 import * as github from "@actions/github";
 import { Octokit } from "@octokit/rest";
 import {
-  OllamaProvider,
+  AnthropicProvider,
   DiffAnalyzer,
   DocRetriever,
   ConfluenceRetriever,
@@ -41,8 +41,8 @@ async function run(): Promise<void> {
   const isFork = pr.head.repo?.fork === true;
 
   const token = core.getInput("github-token", { required: true });
-  const ollamaKey = core.getInput("ollama-api-key");
-  const modelId = core.getInput("model") || "gpt-oss:20b";
+  const anthropicKey = core.getInput("anthropic-api-key");
+  const modelId = core.getInput("model") || "claude-haiku-4-5-20251001";
   const scaffoldEnabled = core.getInput("scaffold-missing-docs") !== "false";
   const confluenceUrl = core.getInput("confluence-url") || undefined;
   const confluenceEmail = core.getInput("confluence-email") || undefined;
@@ -50,13 +50,13 @@ async function run(): Promise<void> {
   const confluenceSpaceKey = core.getInput("confluence-space-key") || undefined;
   const confluenceConfigured = !!(confluenceUrl && confluenceToken);
 
-  if (!ollamaKey) {
-    core.setFailed("ollama-api-key is required.");
+  if (!anthropicKey) {
+    core.setFailed("anthropic-api-key is required.");
     return;
   }
 
-  const llm = new OllamaProvider({ apiKey: ollamaKey, model: modelId });
-  core.info(`Using Ollama (${modelId}) via ollama.com`);
+  const llm = new AnthropicProvider(anthropicKey, modelId);
+  core.info(`Using Anthropic (${modelId})`);
 
   const octokit = new Octokit({ auth: token });
 

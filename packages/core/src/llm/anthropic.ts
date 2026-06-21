@@ -11,7 +11,7 @@ import type { LLMProvider } from "./interface.js";
 import type { DriftAnalysis, ScaffoldOutput } from "../drift/schemas.js";
 
 export class AnthropicProvider implements LLMProvider {
-  readonly modelId = "claude-sonnet-4-6";
+  readonly modelId = "claude-haiku-4-5-20251001";
 
   private readonly client: Anthropic;
 
@@ -29,7 +29,7 @@ export class AnthropicProvider implements LLMProvider {
       const response = await Promise.race([
         this.client.messages.create({
           model: this.modelId,
-          max_tokens: 4096,
+          max_tokens: 8192,
           messages: [{ role: "user", content: prompt }],
           tools: [
             {
@@ -101,7 +101,7 @@ export class AnthropicProvider implements LLMProvider {
       const response = await Promise.race([
         this.client.messages.create({
           model: this.modelId,
-          max_tokens: 4096,
+          max_tokens: 8192,
           messages: [{ role: "user", content: prompt }],
           tools: [
             {
