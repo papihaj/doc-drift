@@ -32235,7 +32235,7 @@ var OllamaProvider = class {
   modelId;
   baseUrl;
   apiKey;
-  constructor({ baseUrl, model = "gpt-oss:latest", apiKey } = {}) {
+  constructor({ baseUrl, model = "gpt-oss:20b", apiKey } = {}) {
     this.apiKey = apiKey ?? process.env["OLLAMA_API_KEY"];
     const defaultUrl = this.apiKey ? CLOUD_BASE_URL : LOCAL_BASE_URL;
     this.baseUrl = (baseUrl ?? defaultUrl).replace(/\/$/, "");

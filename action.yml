@@ -16,7 +16,7 @@ inputs:
   model:
     description: "Ollama model to use. gpt-oss (default) or gpt-oss:120b for higher quality."
     required: false
-    default: "gpt-oss:latest"
+    default: "gpt-oss:20b"
   confidence-threshold:
     description: "Minimum confidence score (0-1) for a finding to be reported"
     required: false
