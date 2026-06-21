@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { DriftAnalysisSchema, ScaffoldOutputSchema, LLM_TIMEOUT_MS } from "../drift/schemas.js";
+import { DriftAnalysisSchema, ScaffoldOutputSchema, LLM_TIMEOUT_MS, LLM_SCAFFOLD_TIMEOUT_MS } from "../drift/schemas.js";
 import {
   LLMEmptyResponseError,
   LLMParseError,
@@ -131,7 +131,7 @@ export class AnthropicProvider implements LLMProvider {
           tool_choice: { type: "any" },
         }),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new LLMTimeoutError("LLM scaffold call timed out")), LLM_TIMEOUT_MS),
+          setTimeout(() => reject(new LLMTimeoutError("LLM scaffold call timed out")), LLM_SCAFFOLD_TIMEOUT_MS),
         ),
       ]);
 

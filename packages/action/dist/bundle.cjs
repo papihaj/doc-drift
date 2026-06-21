@@ -38054,6 +38054,7 @@ var MAX_FINDINGS_PER_PR = 10;
 var MAX_DIFF_BYTES = 10 * 1024 * 1024;
 var MAX_PARALLEL_DOC_FETCHES = 5;
 var LLM_TIMEOUT_MS = 3e4;
+var LLM_SCAFFOLD_TIMEOUT_MS = 9e4;
 var LLM_RETRY_ATTEMPTS = 2;
 
 // ../core/dist/diff/analyzer.js
@@ -42366,7 +42367,7 @@ var AnthropicProvider = class {
           ],
           tool_choice: { type: "any" }
         }),
-        new Promise((_2, reject) => setTimeout(() => reject(new LLMTimeoutError("LLM scaffold call timed out")), LLM_TIMEOUT_MS))
+        new Promise((_2, reject) => setTimeout(() => reject(new LLMTimeoutError("LLM scaffold call timed out")), LLM_SCAFFOLD_TIMEOUT_MS))
       ]);
       const toolUse = response.content.find((b2) => b2.type === "tool_use");
       if (!toolUse || toolUse.type !== "tool_use") {

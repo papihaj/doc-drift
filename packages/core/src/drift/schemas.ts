@@ -39,4 +39,5 @@ export const MAX_FINDINGS_PER_PR = 10;
 export const MAX_DIFF_BYTES = 10 * 1024 * 1024;
 export const MAX_PARALLEL_DOC_FETCHES = 5;
 export const LLM_TIMEOUT_MS = 30_000;
+export const LLM_SCAFFOLD_TIMEOUT_MS = 90_000;
 export const LLM_RETRY_ATTEMPTS = 2;
