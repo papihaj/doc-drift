@@ -106,7 +106,7 @@ export class OllamaProvider implements LLMProvider {
   private readonly baseUrl: string;
   private readonly apiKey: string | undefined;
 
-  constructor({ baseUrl, model = "gpt-oss", apiKey }: OllamaOptions = {}) {
+  constructor({ baseUrl, model = "gpt-oss:latest", apiKey }: OllamaOptions = {}) {
     this.apiKey = apiKey ?? process.env["OLLAMA_API_KEY"];
     // When a key is present, default to cloud; otherwise default to local.
     const defaultUrl = this.apiKey ? CLOUD_BASE_URL : LOCAL_BASE_URL;
