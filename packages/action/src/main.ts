@@ -114,8 +114,8 @@ async function run(): Promise<void> {
       core.info("No Confluence pages found — generating page suggestions...");
       try {
         confluenceSuggestions = await detector.scaffoldConfluence(diff.files, result.findings);
-      } catch {
-        core.warning("Could not generate Confluence page suggestions.");
+      } catch (err) {
+        core.warning(`Could not generate Confluence page suggestions: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 

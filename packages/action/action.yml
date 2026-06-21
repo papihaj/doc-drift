@@ -43,5 +43,5 @@ outputs:
     description: "Number of drift findings detected"
 
 runs:
-  using: "node20"
+  using: "node24"
   main: "dist/bundle.cjs"
