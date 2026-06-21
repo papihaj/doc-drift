@@ -38311,6 +38311,189 @@ function stripStorageFormat(xml) {
   return xml.replace(/<[^>]+>/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 }
 
+// ../core/dist/docs/markdown-to-storage.js
+function markdownToStorage(markdown) {
+  const lines = markdown.split("\n");
+  const output = [];
+  let i2 = 0;
+  while (i2 < lines.length) {
+    const line = lines[i2];
+    if (line.startsWith("```")) {
+      const lang = line.slice(3).trim() || "none";
+      const codeLines = [];
+      i2++;
+      while (i2 < lines.length && !lines[i2].startsWith("```")) {
+        codeLines.push(lines[i2]);
+        i2++;
+      }
+      i2++;
+      const code = escapeXml(codeLines.join("\n"));
+      output.push(`<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">${lang}</ac:parameter><ac:plain-text-body><![CDATA[${code}]]></ac:plain-text-body></ac:structured-macro>`);
+      continue;
+    }
+    if (line.startsWith("|") && line.endsWith("|")) {
+      const tableLines = [];
+      while (i2 < lines.length && lines[i2].startsWith("|") && lines[i2].endsWith("|")) {
+        tableLines.push(lines[i2]);
+        i2++;
+      }
+      output.push(buildTable(tableLines));
+      continue;
+    }
+    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const text = inlineMarkdown(headingMatch[2]);
+      output.push(`<h${level}>${text}</h${level}>`);
+      i2++;
+      continue;
+    }
+    if (line.startsWith("> ")) {
+      const text = inlineMarkdown(line.slice(2));
+      const isWarning = text.includes("\u26A0\uFE0F") || text.toLowerCase().includes("warning") || text.toLowerCase().includes("caution");
+      if (isWarning) {
+        output.push(`<ac:structured-macro ac:name="warning"><ac:rich-text-body><p>${text}</p></ac:rich-text-body></ac:structured-macro>`);
+      } else {
+        output.push(`<ac:structured-macro ac:name="info"><ac:rich-text-body><p>${text}</p></ac:rich-text-body></ac:structured-macro>`);
+      }
+      i2++;
+      continue;
+    }
+    if (/^[-*]{3,}$/.test(line.trim())) {
+      output.push("<hr />");
+      i2++;
+      continue;
+    }
+    if (line.trim() === "") {
+      i2++;
+      continue;
+    }
+    const paraLines = [];
+    while (i2 < lines.length && lines[i2].trim() !== "" && !lines[i2].startsWith("#") && !lines[i2].startsWith(">") && !lines[i2].startsWith("|") && !lines[i2].startsWith("```") && !/^[-*]{3,}$/.test(lines[i2].trim())) {
+      paraLines.push(lines[i2]);
+      i2++;
+    }
+    if (paraLines.length > 0) {
+      output.push(`<p>${inlineMarkdown(paraLines.join(" "))}</p>`);
+    }
+  }
+  return output.join("\n");
+}
+function buildTable(tableLines) {
+  const dataLines = tableLines.filter((l2) => !/^\|[-| :]+\|$/.test(l2));
+  if (dataLines.length === 0)
+    return "";
+  const rows = dataLines.map((l2) => l2.split("|").slice(1, -1).map((cell) => cell.trim()));
+  const [headerRow, ...bodyRows] = rows;
+  if (!headerRow)
+    return "";
+  const head = `<thead><tr>${headerRow.map((c2) => `<th><p>${inlineMarkdown(c2)}</p></th>`).join("")}</tr></thead>`;
+  const body = bodyRows.length > 0 ? `<tbody>${bodyRows.map((row) => `<tr>${row.map((c2) => `<td><p>${inlineMarkdown(c2)}</p></td>`).join("")}</tr>`).join("")}</tbody>` : "";
+  return `<table><colgroup>${headerRow.map(() => "<col />").join("")}</colgroup>${head}${body}</table>`;
+}
+function inlineMarkdown(text) {
+  return text.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>").replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\b_(.+?)_\b/g, "<em>$1</em>").replace(/\*(.+?)\*/g, "<em>$1</em>").replace(/`([^`]+)`/g, "<code>$1</code>").replace(/&(?![a-z]+;|#\d+;)/g, "&amp;");
+}
+function escapeXml(text) {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// ../core/dist/docs/confluence-writer.js
+var ConfluenceWriter = class {
+  config;
+  authHeader;
+  apiBase;
+  constructor(config) {
+    this.config = config;
+    if (config.email) {
+      const creds = Buffer.from(`${config.email}:${config.apiToken}`).toString("base64");
+      this.authHeader = `Basic ${creds}`;
+    } else {
+      this.authHeader = `Bearer ${config.apiToken}`;
+    }
+    this.apiBase = config.baseUrl.replace(/\/+$/, "");
+  }
+  async createPage(title, markdownContent, spaceKey, parentId) {
+    const storageBody = markdownToStorage(markdownContent);
+    const body = {
+      type: "page",
+      title,
+      space: { key: spaceKey },
+      body: {
+        storage: {
+          value: storageBody,
+          representation: "storage"
+        }
+      }
+    };
+    if (parentId) {
+      body["ancestors"] = [{ id: parentId }];
+    }
+    const res = await fetch(`${this.apiBase}/rest/api/content`, {
+      method: "POST",
+      headers: {
+        Authorization: this.authHeader,
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Confluence create failed (${res.status}): ${text.slice(0, 500)}`);
+    }
+    const data = await res.json();
+    return {
+      id: data.id,
+      title: data.title,
+      url: `${this.apiBase}${data._links.webui}`
+    };
+  }
+  async updatePage(pageId, title, markdownContent) {
+    const current = await this.getPageVersion(pageId);
+    const storageBody = markdownToStorage(markdownContent);
+    const res = await fetch(`${this.apiBase}/rest/api/content/${pageId}`, {
+      method: "PUT",
+      headers: {
+        Authorization: this.authHeader,
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify({
+        version: { number: current.version + 1 },
+        title,
+        type: "page",
+        body: {
+          storage: {
+            value: storageBody,
+            representation: "storage"
+          }
+        }
+      })
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Confluence update failed (${res.status}): ${text.slice(0, 500)}`);
+    }
+    const data = await res.json();
+    return {
+      id: data.id,
+      title: data.title,
+      url: `${this.apiBase}${data._links.webui}`
+    };
+  }
+  async getPageVersion(pageId) {
+    const res = await fetch(`${this.apiBase}/rest/api/content/${pageId}?expand=version`, {
+      headers: { Authorization: this.authHeader, Accept: "application/json" }
+    });
+    if (!res.ok) {
+      throw new Error(`Could not fetch page ${pageId}: ${res.status}`);
+    }
+    const data = await res.json();
+    return { version: data.version.number, title: data.title };
+  }
+};
+
 // ../core/dist/drift/prompt.js
 function buildScaffoldPrompt(diffFiles) {
   const diffSection = diffFiles.map((f2) => `### ${f2.path} (${f2.status}, +${f2.additions}/-${f2.deletions})
@@ -38572,6 +38755,21 @@ _Analyzed in ${durationSec}s \xB7 ${result.checkedDocFiles.length} doc file${res
 function buildConfluenceEmptyNote(confluence) {
   const spaceLabel = confluence.confluenceSpaceKey ? ` \`${confluence.confluenceSpaceKey}\`` : "";
   const spaceUrl = confluence.confluenceUrl ?? "your Confluence space";
+  if (confluence.createdPages && confluence.createdPages.length > 0) {
+    const pages = confluence.createdPages;
+    const parts2 = [
+      ``,
+      `---`,
+      `## \u{1F4D8} Confluence Pages Created`,
+      ``,
+      `No documentation existed for these changes. DocDrift created ${pages.length} page${pages.length !== 1 ? "s" : ""} in your Confluence space${spaceLabel}:
+`
+    ];
+    for (const p2 of pages) {
+      parts2.push(`- \u{1F4C4} [${p2.title}](${p2.url})`);
+    }
+    return parts2.join("\n");
+  }
   if (!confluence.confluenceSuggestions || confluence.confluenceSuggestions.length === 0) {
     return `
 > **No Confluence pages found** for these changes in space${spaceLabel}. Consider adding documentation at ${spaceUrl}.`;
@@ -42421,6 +42619,7 @@ async function run() {
   const confluenceEmail = core.getInput("confluence-email") || void 0;
   const confluenceToken = core.getInput("confluence-api-token") || void 0;
   const confluenceSpaceKey = core.getInput("confluence-space-key") || void 0;
+  const confluenceParentPageId = core.getInput("confluence-parent-page-id") || void 0;
   const confluenceConfigured = !!(confluenceUrl && confluenceToken);
   if (!anthropicKey) {
     core.setFailed("anthropic-api-key is required.");
@@ -42467,10 +42666,37 @@ async function run() {
     core.setOutput("findings-count", String(result.findings.length));
     const confluenceEmpty = confluenceConfigured && confluenceDocs.length === 0;
     let confluenceSuggestions;
+    let createdPages = [];
     if (confluenceEmpty) {
-      core.info("No Confluence pages found \u2014 generating page suggestions...");
+      core.info("No Confluence pages found \u2014 generating and creating pages...");
       try {
         confluenceSuggestions = await detector.scaffoldConfluence(diff.files, result.findings);
+        if (confluenceSuggestions && confluenceSuggestions.length > 0 && confluenceSpaceKey) {
+          const writer = new ConfluenceWriter({
+            baseUrl: confluenceUrl,
+            apiToken: confluenceToken,
+            ...confluenceEmail ? { email: confluenceEmail } : {},
+            ...confluenceSpaceKey ? { spaceKey: confluenceSpaceKey } : {}
+          });
+          for (const suggestion of confluenceSuggestions) {
+            try {
+              const page = await writer.createPage(
+                suggestion.filename,
+                suggestion.content,
+                confluenceSpaceKey,
+                confluenceParentPageId
+              );
+              createdPages.push({ title: page.title, url: page.url });
+              core.info(`Created Confluence page: ${page.title} \u2014 ${page.url}`);
+            } catch (pageErr) {
+              core.warning(
+                `Failed to create page "${suggestion.filename}": ${pageErr instanceof Error ? pageErr.message : String(pageErr)}`
+              );
+            }
+          }
+        } else if (confluenceSuggestions && confluenceSuggestions.length > 0 && !confluenceSpaceKey) {
+          core.warning("confluence-space-key is required to auto-create pages. Suggestions will appear in PR comment only.");
+        }
       } catch (err) {
         const detail = err instanceof LLMParseError ? err.raw : err instanceof Error ? err.message : String(err);
         core.warning(`Could not generate Confluence page suggestions: ${detail}`);
@@ -42478,7 +42704,7 @@ async function run() {
     }
     const isFirstRun = await checkIsFirstRun(octokit, owner, repo, pullNumber);
     const comment = `${DOCDRIFT_COMMENT_MARKER}
-${buildPRComment(result, isFirstRun, { confluenceConfigured, confluenceUrl, confluenceSpaceKey, confluenceEmpty, confluenceSuggestions })}`;
+${buildPRComment(result, isFirstRun, { confluenceConfigured, confluenceUrl, confluenceSpaceKey, confluenceEmpty, confluenceSuggestions, createdPages })}`;
     if (isFork) {
       core.info("PR is from a fork \u2014 skipping comment (insufficient permissions). Findings logged above.");
       core.info(comment);

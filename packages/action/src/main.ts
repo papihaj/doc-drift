@@ -6,6 +6,7 @@ import {
   DiffAnalyzer,
   DocRetriever,
   ConfluenceRetriever,
+  ConfluenceWriter,
   DriftDetector,
   buildPRComment,
   LLMProviderError,
@@ -49,6 +50,7 @@ async function run(): Promise<void> {
   const confluenceEmail = core.getInput("confluence-email") || undefined;
   const confluenceToken = core.getInput("confluence-api-token") || undefined;
   const confluenceSpaceKey = core.getInput("confluence-space-key") || undefined;
+  const confluenceParentPageId = core.getInput("confluence-parent-page-id") || undefined;
   const confluenceConfigured = !!(confluenceUrl && confluenceToken);
 
   if (!anthropicKey) {
@@ -111,20 +113,49 @@ async function run(): Promise<void> {
     const confluenceEmpty = confluenceConfigured && confluenceDocs.length === 0;
 
     let confluenceSuggestions: Awaited<ReturnType<typeof detector.scaffoldConfluence>> | undefined;
+    let createdPages: { title: string; url: string }[] = [];
+
     if (confluenceEmpty) {
-      core.info("No Confluence pages found — generating page suggestions...");
+      core.info("No Confluence pages found — generating and creating pages...");
       try {
         confluenceSuggestions = await detector.scaffoldConfluence(diff.files, result.findings);
+
+        if (confluenceSuggestions && confluenceSuggestions.length > 0 && confluenceSpaceKey) {
+          const writer = new ConfluenceWriter({
+            baseUrl: confluenceUrl!,
+            apiToken: confluenceToken!,
+            ...(confluenceEmail ? { email: confluenceEmail } : {}),
+            ...(confluenceSpaceKey ? { spaceKey: confluenceSpaceKey } : {}),
+          });
+
+          for (const suggestion of confluenceSuggestions) {
+            try {
+              const page = await writer.createPage(
+                suggestion.filename,
+                suggestion.content,
+                confluenceSpaceKey,
+                confluenceParentPageId,
+              );
+              createdPages.push({ title: page.title, url: page.url });
+              core.info(`Created Confluence page: ${page.title} — ${page.url}`);
+            } catch (pageErr) {
+              core.warning(
+                `Failed to create page "${suggestion.filename}": ${pageErr instanceof Error ? pageErr.message : String(pageErr)}`,
+              );
+            }
+          }
+        } else if (confluenceSuggestions && confluenceSuggestions.length > 0 && !confluenceSpaceKey) {
+          core.warning("confluence-space-key is required to auto-create pages. Suggestions will appear in PR comment only.");
+        }
       } catch (err) {
-        const detail = err instanceof LLMParseError
-          ? err.raw
-          : err instanceof Error ? err.message : String(err);
+        const detail =
+          err instanceof LLMParseError ? err.raw : err instanceof Error ? err.message : String(err);
         core.warning(`Could not generate Confluence page suggestions: ${detail}`);
       }
     }
 
     const isFirstRun = await checkIsFirstRun(octokit, owner, repo, pullNumber);
-    const comment = `${DOCDRIFT_COMMENT_MARKER}\n${buildPRComment(result, isFirstRun, { confluenceConfigured, confluenceUrl, confluenceSpaceKey, confluenceEmpty, confluenceSuggestions })}`;
+    const comment = `${DOCDRIFT_COMMENT_MARKER}\n${buildPRComment(result, isFirstRun, { confluenceConfigured, confluenceUrl, confluenceSpaceKey, confluenceEmpty, confluenceSuggestions, createdPages })}`;
 
     if (isFork) {
       core.info("PR is from a fork — skipping comment (insufficient permissions). Findings logged above.");

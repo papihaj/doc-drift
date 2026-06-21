@@ -1,5 +1,5 @@
 import { markdownToStorage } from "./markdown-to-storage.js";
-import type { ConfluenceConfig } from "@docdrift/core";
+import type { ConfluenceConfig } from "./confluence.js";
 
 export interface CreatedPage {
   id: string;
@@ -21,7 +21,12 @@ export class ConfluenceWriter {
     this.apiBase = config.baseUrl.replace(/\/+$/, "");
   }
 
-  async createPage(title: string, markdownContent: string, spaceKey: string, parentId?: string): Promise<CreatedPage> {
+  async createPage(
+    title: string,
+    markdownContent: string,
+    spaceKey: string,
+    parentId?: string,
+  ): Promise<CreatedPage> {
     const storageBody = markdownToStorage(markdownContent);
 
     const body: Record<string, unknown> = {
@@ -64,7 +69,6 @@ export class ConfluenceWriter {
   }
 
   async updatePage(pageId: string, title: string, markdownContent: string): Promise<CreatedPage> {
-    // Fetch current version number first — required by Confluence REST API
     const current = await this.getPageVersion(pageId);
     const storageBody = markdownToStorage(markdownContent);
 

@@ -37,6 +37,9 @@ inputs:
   confluence-space-key:
     description: "Confluence space key to scope page search (e.g. TECH). Omit to search all spaces."
     required: false
+  confluence-parent-page-id:
+    description: "Confluence page ID to nest auto-created pages under. Optional."
+    required: false
 
 outputs:
   findings-count:

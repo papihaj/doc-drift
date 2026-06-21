@@ -10,7 +10,7 @@ import {
   ConfluenceRetriever,
   DriftDetector,
 } from "@docdrift/core";
-import { ConfluenceWriter } from "./confluence-writer.js";
+import { ConfluenceWriter } from "@docdrift/core";
 import { z } from "zod";
 
 const AnalyzePrSchema = z.object({

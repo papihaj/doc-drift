@@ -13,6 +13,7 @@ export interface ConfluenceOptions {
   confluenceSpaceKey?: string;
   confluenceEmpty?: boolean;
   confluenceSuggestions?: import("../drift/schemas.js").ScaffoldSuggestion[];
+  createdPages?: { title: string; url: string }[];
 }
 
 export function buildPRComment(result: DetectionResult, isFirstRun: boolean, confluence?: ConfluenceOptions): string {
@@ -79,6 +80,22 @@ export function buildPRComment(result: DetectionResult, isFirstRun: boolean, con
 function buildConfluenceEmptyNote(confluence: ConfluenceOptions): string {
   const spaceLabel = confluence.confluenceSpaceKey ? ` \`${confluence.confluenceSpaceKey}\`` : "";
   const spaceUrl = confluence.confluenceUrl ?? "your Confluence space";
+
+  // Pages were auto-created — show links
+  if (confluence.createdPages && confluence.createdPages.length > 0) {
+    const pages = confluence.createdPages;
+    const parts: string[] = [
+      ``,
+      `---`,
+      `## 📘 Confluence Pages Created`,
+      ``,
+      `No documentation existed for these changes. DocDrift created ${pages.length} page${pages.length !== 1 ? "s" : ""} in your Confluence space${spaceLabel}:\n`,
+    ];
+    for (const p of pages) {
+      parts.push(`- 📄 [${p.title}](${p.url})`);
+    }
+    return parts.join("\n");
+  }
 
   if (!confluence.confluenceSuggestions || confluence.confluenceSuggestions.length === 0) {
     return `\n> **No Confluence pages found** for these changes in space${spaceLabel}. Consider adding documentation at ${spaceUrl}.`;

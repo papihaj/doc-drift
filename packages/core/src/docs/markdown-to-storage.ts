@@ -1,9 +1,3 @@
-/**
- * Converts markdown to Confluence Storage Format (XHTML).
- * Handles the subset of markdown that DocDrift generates:
- * headings, tables, fenced code blocks, bold, italic, inline code,
- * blockquotes, field-definition lines, and paragraphs.
- */
 export function markdownToStorage(markdown: string): string {
   const lines = markdown.split("\n");
   const output: string[] = [];
@@ -53,7 +47,10 @@ export function markdownToStorage(markdown: string): string {
     // Blockquote (⚠️ warnings → Confluence warning macro)
     if (line.startsWith("> ")) {
       const text = inlineMarkdown(line.slice(2));
-      const isWarning = text.includes("⚠️") || text.toLowerCase().includes("warning") || text.toLowerCase().includes("caution");
+      const isWarning =
+        text.includes("⚠️") ||
+        text.toLowerCase().includes("warning") ||
+        text.toLowerCase().includes("caution");
       if (isWarning) {
         output.push(
           `<ac:structured-macro ac:name="warning"><ac:rich-text-body><p>${text}</p></ac:rich-text-body></ac:structured-macro>`,
@@ -103,7 +100,6 @@ export function markdownToStorage(markdown: string): string {
 }
 
 function buildTable(tableLines: string[]): string {
-  // Filter separator lines (|---|---|)
   const dataLines = tableLines.filter((l) => !/^\|[-| :]+\|$/.test(l));
   if (dataLines.length === 0) return "";
 
@@ -129,23 +125,15 @@ function buildTable(tableLines: string[]): string {
 function inlineMarkdown(text: string): string {
   return (
     text
-      // Bold+italic
       .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
-      // Bold
       .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-      // Italic (underscore or asterisk)
       .replace(/\b_(.+?)_\b/g, "<em>$1</em>")
       .replace(/\*(.+?)\*/g, "<em>$1</em>")
-      // Inline code
       .replace(/`([^`]+)`/g, "<code>$1</code>")
-      // Escape remaining XML special chars (outside tags)
       .replace(/&(?![a-z]+;|#\d+;)/g, "&amp;")
   );
 }
 
 function escapeXml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
