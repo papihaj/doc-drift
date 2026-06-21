@@ -35,4 +35,4 @@ outputs:
 
 runs:
   using: "node20"
-  main: "packages/action/dist/bundle.js"
+  main: "packages/action/dist/bundle.cjs"

@@ -2,7 +2,7 @@ node_modules/
 dist/
 !packages/action/dist/
 packages/action/dist/*
-!packages/action/dist/bundle.js
+!packages/action/dist/bundle.cjs
 *.js.map
 *.d.ts.map
 .env
