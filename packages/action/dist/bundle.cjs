@@ -31962,18 +31962,6 @@ Analyze the diff against the docs. For each mismatch you find with confidence >=
 }
 
 // ../core/dist/drift/detector.js
-var NO_SCAFFOLD_PATTERNS = [
-  /^\.github\//,
-  /^\.husky\//,
-  /^node_modules\//,
-  /\.(test|spec)\.(ts|tsx|js|jsx)$/,
-  /\/__tests__\//,
-  /\/fixtures\//,
-  /^(\.eslintrc|\.prettierrc|\.editorconfig|tsconfig|jest\.config|vitest\.config|vite\.config)/,
-  /\.(lock|toml)$/,
-  /^(package|package-lock|pnpm-lock|yarn\.lock|composer\.lock)\.json$/,
-  /^(tsconfig|jsconfig|\.eslintrc|\.prettierrc|babel\.config|rollup\.config|webpack\.config)\.json$/
-];
 var DriftDetector = class {
   llm;
   scaffoldEnabled;
@@ -31983,7 +31971,7 @@ var DriftDetector = class {
   }
   async detect(diffFiles, docFiles) {
     if (docFiles.length === 0) {
-      if (this.scaffoldEnabled && !shouldSkipScaffold(diffFiles)) {
+      if (this.scaffoldEnabled) {
         return this.runScaffold(diffFiles);
       }
       return {
@@ -32060,9 +32048,6 @@ var DriftDetector = class {
     }
   }
 };
-function shouldSkipScaffold(diffFiles) {
-  return diffFiles.every((f) => NO_SCAFFOLD_PATTERNS.some((p) => p.test(f.path)));
-}
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -11,19 +11,6 @@ import {
 import type { DriftAnalysis, Finding, ScaffoldSuggestion } from "./schemas.js";
 import { LLMParseError, LLMProviderError, LLMTimeoutError } from "../errors.js";
 
-// Files in these paths are unlikely to need hand-written documentation.
-const NO_SCAFFOLD_PATTERNS = [
-  /^\.github\//,
-  /^\.husky\//,
-  /^node_modules\//,
-  /\.(test|spec)\.(ts|tsx|js|jsx)$/,
-  /\/__tests__\//,
-  /\/fixtures\//,
-  /^(\.eslintrc|\.prettierrc|\.editorconfig|tsconfig|jest\.config|vitest\.config|vite\.config)/,
-  /\.(lock|toml)$/,
-  /^(package|package-lock|pnpm-lock|yarn\.lock|composer\.lock)\.json$/,
-  /^(tsconfig|jsconfig|\.eslintrc|\.prettierrc|babel\.config|rollup\.config|webpack\.config)\.json$/,
-];
 
 export interface DetectionResult {
   findings: Finding[];
@@ -42,7 +29,7 @@ export class DriftDetector {
 
   async detect(diffFiles: DiffFile[], docFiles: DocFile[]): Promise<DetectionResult> {
     if (docFiles.length === 0) {
-      if (this.scaffoldEnabled && !shouldSkipScaffold(diffFiles)) {
+      if (this.scaffoldEnabled) {
         return this.runScaffold(diffFiles);
       }
       return {
@@ -141,10 +128,6 @@ export class DriftDetector {
       throw err;
     }
   }
-}
-
-function shouldSkipScaffold(diffFiles: DiffFile[]): boolean {
-  return diffFiles.every((f) => NO_SCAFFOLD_PATTERNS.some((p) => p.test(f.path)));
 }
 
 function sleep(ms: number): Promise<void> {
