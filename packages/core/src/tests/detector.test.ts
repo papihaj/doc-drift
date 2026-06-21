@@ -208,6 +208,60 @@ describe("DriftDetector", () => {
     });
   });
 
+  describe("scaffoldConfluence", () => {
+    it("returns empty array when LLM returns {} (Haiku empty tool call, default kicks in)", async () => {
+      const llm = makeMockLLM({
+        scaffold: vi.fn().mockResolvedValue({ suggestedDocs: [], summary: "" }),
+      });
+      const detector = new DriftDetector(llm);
+      const result = await detector.scaffoldConfluence([srcFile], []);
+
+      expect(result).toEqual([]);
+    });
+
+    it("returns suggestions when LLM provides page outlines", async () => {
+      const llm = makeMockLLM({
+        scaffold: vi.fn().mockResolvedValue({
+          suggestedDocs: [
+            { filename: "Architecture Overview", content: "- Overview\n- Setup\n- API", rationale: "No arch doc" },
+          ],
+          summary: "Suggested 1 Confluence page",
+        }),
+      });
+      const detector = new DriftDetector(llm);
+      const result = await detector.scaffoldConfluence([srcFile], []);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]!.filename).toBe("Architecture Overview");
+      expect(result[0]!.content).toContain("- Overview");
+    });
+
+    it("returns empty array when LLM returns only summary and no suggestedDocs", async () => {
+      const llm = makeMockLLM({
+        scaffold: vi.fn().mockResolvedValue({
+          suggestedDocs: [],
+          summary: "Three comprehensive Confluence pages documenting...",
+        }),
+      });
+      const detector = new DriftDetector(llm);
+      const result = await detector.scaffoldConfluence([srcFile], []);
+
+      expect(result).toEqual([]);
+    });
+
+    it("passes findings context to the scaffold prompt", async () => {
+      const scaffold = vi.fn().mockResolvedValue({ suggestedDocs: [], summary: "" });
+      const llm = makeMockLLM({ scaffold });
+      const detector = new DriftDetector(llm);
+      const findings = driftAnalysis.findings;
+      await detector.scaffoldConfluence([srcFile], findings);
+
+      expect(scaffold).toHaveBeenCalledOnce();
+      const promptArg: string = scaffold.mock.calls[0][0];
+      expect(promptArg).toContain("createUser signature changed");
+    });
+  });
+
   describe("retry behavior", () => {
     it("retries analyze on LLMParseError up to limit", async () => {
       const analyze = vi
