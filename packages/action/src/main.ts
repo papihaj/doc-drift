@@ -46,6 +46,9 @@ async function run(): Promise<void> {
   const ollamaKey = core.getInput("ollama-api-key");
   const modelId = core.getInput("model") || undefined;
   const scaffoldEnabled = core.getInput("scaffold-missing-docs") !== "false";
+  const confluenceUrl = core.getInput("confluence-url") || undefined;
+  const confluenceToken = core.getInput("confluence-api-token") || undefined;
+  const confluenceConfigured = !!(confluenceUrl && confluenceToken);
 
   let llm: LLMProvider;
   if (ollamaKey) {
@@ -97,7 +100,7 @@ async function run(): Promise<void> {
     core.setOutput("findings-count", String(result.findings.length));
 
     const isFirstRun = await checkIsFirstRun(octokit, owner, repo, pullNumber);
-    const comment = `${DOCDRIFT_COMMENT_MARKER}\n${buildPRComment(result, isFirstRun)}`;
+    const comment = `${DOCDRIFT_COMMENT_MARKER}\n${buildPRComment(result, isFirstRun, { confluenceConfigured, confluenceUrl })}`;
 
     if (isFork) {
       core.info("PR is from a fork — skipping comment (insufficient permissions). Findings logged above.");

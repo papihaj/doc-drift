@@ -28,6 +28,12 @@ inputs:
     description: "When no doc files exist, generate starter documentation stubs as a PR comment"
     required: false
     default: "true"
+  confluence-url:
+    description: "Confluence base URL (e.g. https://yourorg.atlassian.net/wiki). When set, DocDrift will sync drift fixes to Confluence pages."
+    required: false
+  confluence-api-token:
+    description: "Atlassian API token for Confluence. Required when confluence-url is set."
+    required: false
 
 outputs:
   findings-count:

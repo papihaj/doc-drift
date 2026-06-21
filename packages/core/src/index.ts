@@ -21,6 +21,7 @@ export {
 export type { Finding, DriftAnalysis, ScaffoldSuggestion, ScaffoldOutput, Severity } from "./drift/schemas.js";
 
 export { buildPRComment } from "./suggestions/builder.js";
+export type { ConfluenceOptions } from "./suggestions/builder.js";
 export { buildScaffoldPrompt } from "./drift/prompt.js";
 
 export type { LLMProvider } from "./llm/interface.js";

@@ -89,10 +89,21 @@
 
 ---
 
+## P2 — Confluence / Atlassian MCP Integration
+
+### Confluence sync via Atlassian MCP
+**What:** When DocDrift finds drift and a user applies the suggested fix, automatically push the updated doc content to the corresponding Confluence page using the Atlassian MCP server.
+**Why:** Teams that maintain both GitHub markdown docs and Confluence pages today do it manually — they apply DocDrift's suggested patch to the markdown, then copy it over to Confluence. This automates that second step.
+**Inputs:** `confluence-url` and `confluence-api-token` are already wired into `action.yml`. The onboarding first-run comment now prompts users to add these if not set.
+**MCP surface:** Use the Atlassian MCP server (`@atlassian/mcp-atlassian`) to search for matching Confluence pages by title/label, then update page content via the Confluence REST API.
+**Decision points:** Page matching strategy (by title? by label? by a `.docdrift` frontmatter tag?), content format (Confluence Storage Format vs. markdown via a converter like `@atlassian/adf-utils`).
+**Effort:** L | **Priority:** P2 | **Depends on:** V1 shipped, user adoption, Atlassian MCP available
+
+---
+
 ## Explicitly Skipped
 
 - **Doc coverage score** — premature without 30+ days of findings data; revisit in V2
-- **Confluence / Jira / Notion integration** — V2+; markdown-first
 - **Slack / Teams notifications** — V2+; GitHub comment is sufficient for V1
 - **Autonomous PR creation** — out of scope; DocDrift suggests, humans act
 - **Knowledge graph** — V3+; requires significant NLP investment beyond LLM calls

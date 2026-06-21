@@ -7,12 +7,18 @@ const SEVERITY_EMOJI: Record<Finding["severity"], string> = {
   low: "🔵",
 };
 
-export function buildPRComment(result: DetectionResult, isFirstRun: boolean): string {
+export interface ConfluenceOptions {
+  confluenceConfigured: boolean;
+  confluenceUrl?: string;
+}
+
+export function buildPRComment(result: DetectionResult, isFirstRun: boolean, confluence?: ConfluenceOptions): string {
   const parts: string[] = [];
 
   if (isFirstRun) {
+    const confluenceNote = buildConfluenceOnboardingNote(confluence);
     parts.push(
-      `> **DocDrift is now watching your docs.** It checks: API signature changes, renamed endpoints, added/removed parameters, and config changes that affect documented behavior. It does not rewrite docs automatically — you decide what to apply.\n`,
+      `> **DocDrift is now watching your docs.** It checks: API signature changes, renamed endpoints, added/removed parameters, and config changes that affect documented behavior. It does not rewrite docs automatically — you decide what to apply.${confluenceNote}\n`,
     );
   }
 
@@ -55,6 +61,20 @@ export function buildPRComment(result: DetectionResult, isFirstRun: boolean): st
   );
 
   return parts.join("\n");
+}
+
+function buildConfluenceOnboardingNote(confluence?: ConfluenceOptions): string {
+  if (!confluence) {
+    return (
+      `\n>\n> **Have a Confluence space?** Add \`confluence-url\` and \`confluence-api-token\` to your DocDrift workflow to automatically sync drift fixes to your Confluence pages.`
+    );
+  }
+  if (confluence.confluenceConfigured && confluence.confluenceUrl) {
+    return `\n>\n> **Confluence sync enabled** — DocDrift will update pages at \`${confluence.confluenceUrl}\` when drift is applied.`;
+  }
+  return (
+    `\n>\n> **Have a Confluence space?** Add \`confluence-url\` and \`confluence-api-token\` to your DocDrift workflow to automatically sync drift fixes to your Confluence pages.`
+  );
 }
 
 function buildScaffoldSection(suggestions: ScaffoldSuggestion[]): string[] {

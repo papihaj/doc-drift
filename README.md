@@ -1,8 +1,8 @@
 # DocDrift
 
-Detect documentation drift on every pull request. DocDrift checks whether your code changes made existing documentation stale — and posts findings as PR comments so nothing ships undocumented.
+Detect documentation drift on every pull request. DocDrift checks whether your code changes makes existing documentation stale — and posts findings as PR comments for you to validate so nothing ships undocumented.
 
-If a repo has no documentation at all, DocDrift generates starter doc stubs based on the PR diff so you can add them in the same PR.
+If a repo has no documentation at all, DocDrift generates starter doc so you can add them in the same PR.
 
 ---
 
@@ -28,12 +28,7 @@ Analyze diff vs docs    Generate doc stubs
        Post PR comment
 ```
 
-DocDrift is distributed as:
-
-- **GitHub Action** — free, runs in your CI, no server required
-- **GitHub App** — SaaS tier with persistence and a dashboard (coming soon)
-
-Both share the same `@docdrift/core` analysis library.
+DocDrift is distributed as a GitHub Action\*\* — runs for free in your CI, no server required
 
 ---
 
@@ -63,18 +58,21 @@ jobs:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
-### 2. Add your Anthropic API key
+### 2. Add your Anthropic API key/Ollama Key
 
 In your repo: **Settings → Secrets and variables → Actions → New repository secret**
 
 - Name: `ANTHROPIC_API_KEY`
 - Value: your key from [console.anthropic.com](https://console.anthropic.com)
 
+- Name: 'OLLAMA_API_KEY'
+- Value: your key from [https://ollama.com/settings/keys](hhttps://ollama.com/settings/keys)
+
 ### 3. Add a DocDrift section to your repo's README
 
 Paste this into your project's README so contributors and AI agents know DocDrift is active:
 
-````markdown
+```markdown
 ## Documentation
 
 This repo uses [DocDrift](https://github.com/papihaj/doc-drift) to keep documentation in sync with code changes.
@@ -84,10 +82,11 @@ This repo uses [DocDrift](https://github.com/papihaj/doc-drift) to keep document
 **For AI coding agents:** Before generating code that calls internal APIs or uses config, read the doc files in `docs/` and `README.md` first — they reflect the current behavior. If DocDrift posted a comment on this PR, apply the suggested doc updates before marking your task complete.
 
 Doc files this repo tracks:
+
 - `README.md` — project overview and usage
 - `docs/` — API reference and guides
 - `openapi.yaml` — HTTP API schema (if present)
-````
+```
 
 ### 4. Open a pull request
 
@@ -99,13 +98,13 @@ DocDrift posts a comment on every PR with findings. On a repo with no docs yet, 
 
 All inputs are optional except `anthropic-api-key`.
 
-| Input | Default | Description |
-|---|---|---|
-| `anthropic-api-key` | — | Anthropic API key. Required when using the Anthropic provider. |
-| `github-token` | `${{ github.token }}` | GitHub token for reading diffs and posting comments. The default token is sufficient for most repos. |
-| `model` | `claude-sonnet-4-6` | Model to use for analysis. Set to `gpt-oss` or `gpt-oss:120b` when using Ollama. |
-| `confidence-threshold` | `0.7` | Minimum confidence score (0–1) for a finding to be reported. Raise this to reduce noise; lower it to catch more potential drift. |
-| `scaffold-missing-docs` | `true` | When no doc files exist, generate starter documentation stubs as a PR comment. Set to `false` to disable. |
+| Input                   | Default               | Description                                                                                                                      |
+| ----------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `anthropic-api-key`     | —                     | Anthropic API key. Required when using the Anthropic provider.                                                                   |
+| `github-token`          | `${{ github.token }}` | GitHub token for reading diffs and posting comments. The default token is sufficient for most repos.                             |
+| `model`                 | `claude-sonnet-4-6`   | Model to use for analysis. Set to `gpt-oss` or `gpt-oss:120b` when using Ollama.                                                 |
+| `confidence-threshold`  | `0.7`                 | Minimum confidence score (0–1) for a finding to be reported. Raise this to reduce noise; lower it to catch more potential drift. |
+| `scaffold-missing-docs` | `true`                | When no doc files exist, generate starter documentation stubs as a PR comment. Set to `false` to disable.                        |
 
 ### Example with all options
 
@@ -156,10 +155,10 @@ const llm = new OllamaProvider({ model: "gpt-oss:120b" });
 const detector = new DriftDetector(llm);
 ```
 
-| Variant | RAM needed | Best for |
-|---|---|---|
-| `gpt-oss` / `gpt-oss:20b` | 16GB | Local development |
-| `gpt-oss:120b` | 80GB | Cloud or high-memory machines |
+| Variant                   | RAM needed | Best for                      |
+| ------------------------- | ---------- | ----------------------------- |
+| `gpt-oss` / `gpt-oss:20b` | 16GB       | Local development             |
+| `gpt-oss:120b`            | 80GB       | Cloud or high-memory machines |
 
 ---
 
@@ -190,7 +189,7 @@ CONTRIBUTING.*
 
 **When drift is found:**
 
-```
+````
 ## DocDrift Analysis
 
 2 documentation drift findings detected (1 high, 1 medium)
@@ -208,7 +207,7 @@ The `role` parameter is now required but the docs still show the old signature.
 
 ---
 _Analyzed in 4.2s · 2 doc files checked · claude-sonnet-4-6_
-```
+````
 
 **When no docs exist (scaffold mode):**
 
@@ -247,8 +246,8 @@ The action requires:
 
 ```yaml
 permissions:
-  pull-requests: write   # post PR comments
-  contents: read         # read doc files and diff
+  pull-requests: write # post PR comments
+  contents: read # read doc files and diff
 ```
 
 ---
@@ -263,32 +262,33 @@ Every analysis produces a `DetectionResult`:
 
 ```typescript
 interface DetectionResult {
-  findings: Finding[];              // drift findings, sorted high→medium→low, max 10
-  checkedDocFiles: string[];        // doc file paths that were read
-  chunksAnalyzed: number;           // number of diff chunks sent to the LLM
-  modelId: string;                  // model that ran the analysis
-  durationMs: number;               // wall-clock time for the LLM call(s)
+  findings: Finding[]; // drift findings, sorted high→medium→low, max 10
+  checkedDocFiles: string[]; // doc file paths that were read
+  chunksAnalyzed: number; // number of diff chunks sent to the LLM
+  modelId: string; // model that ran the analysis
+  durationMs: number; // wall-clock time for the LLM call(s)
   scaffoldSuggestions?: ScaffoldSuggestion[]; // only present when no docs exist
 }
 
 interface Finding {
-  docFile: string;          // path of the doc file that needs updating
-  codeFile: string;         // path of the changed code file that caused the drift
-  issue: string;            // one-line summary of the mismatch
-  explanation: string;      // detailed explanation
-  suggestedUpdate: string;  // suggested doc patch in diff format
+  docFile: string; // path of the doc file that needs updating
+  codeFile: string; // path of the changed code file that caused the drift
+  issue: string; // one-line summary of the mismatch
+  explanation: string; // detailed explanation
+  suggestedUpdate: string; // suggested doc patch in diff format
   severity: "high" | "medium" | "low";
-  confidence: number;       // 0–1, only findings >= 0.7 are returned
+  confidence: number; // 0–1, only findings >= 0.7 are returned
 }
 
 interface ScaffoldSuggestion {
-  filename: string;   // suggested path for the new doc file (e.g. "README.md")
-  content: string;    // full markdown content to write
-  rationale: string;  // one-line explanation of why this file is needed
+  filename: string; // suggested path for the new doc file (e.g. "README.md")
+  content: string; // full markdown content to write
+  rationale: string; // one-line explanation of why this file is needed
 }
 ```
 
 **Decision rule for agents:**
+
 - `scaffoldSuggestions` is present → no docs exist; suggestions are starter content to commit
 - `findings.length > 0` → docs exist but are stale; each finding has a `suggestedUpdate` diff to apply
 - `findings.length === 0` and no `scaffoldSuggestions` → docs are up to date; no action needed
@@ -301,7 +301,7 @@ import {
   DiffAnalyzer,
   DocRetriever,
   DriftDetector,
-  AnthropicProvider,   // or OllamaProvider
+  AnthropicProvider, // or OllamaProvider
   buildPRComment,
 } from "@docdrift/core";
 
@@ -311,9 +311,18 @@ const llm = new AnthropicProvider(process.env.ANTHROPIC_API_KEY!);
 // scaffoldEnabled=true (default): generates doc stubs when no docs found
 const detector = new DriftDetector(llm, true);
 
-const diffFiles = await new DiffAnalyzer(octokit).analyze(owner, repo, prNumber);
-const docFiles  = await new DocRetriever(octokit).fetch(owner, repo, headSha, diffFiles);
-const result    = await detector.detect(diffFiles, docFiles);
+const diffFiles = await new DiffAnalyzer(octokit).analyze(
+  owner,
+  repo,
+  prNumber,
+);
+const docFiles = await new DocRetriever(octokit).fetch(
+  owner,
+  repo,
+  headSha,
+  diffFiles,
+);
+const result = await detector.detect(diffFiles, docFiles);
 
 // isFirstRun=true adds an onboarding message to the comment
 const comment = buildPRComment(result, isFirstRun);
@@ -324,10 +333,7 @@ const comment = buildPRComment(result, isFirstRun);
 If you already have the diff and docs as strings (e.g. from a local git repo), skip `DiffAnalyzer` and `DocRetriever` and call `DriftDetector` directly with the raw types:
 
 ```typescript
-import {
-  DriftDetector,
-  OllamaProvider,
-} from "@docdrift/core";
+import { DriftDetector, OllamaProvider } from "@docdrift/core";
 import type { DiffFile, DocFile } from "@docdrift/core";
 
 const llm = new OllamaProvider({ model: "gpt-oss" });
@@ -336,7 +342,7 @@ const detector = new DriftDetector(llm, true);
 const diffFiles: DiffFile[] = [
   {
     path: "src/api/users.ts",
-    status: "modified",       // "added" | "modified" | "removed" | "renamed"
+    status: "modified", // "added" | "modified" | "removed" | "renamed"
     additions: 10,
     deletions: 2,
     patch: "-createUser(name)\n+createUser(name, role)",
@@ -367,10 +373,10 @@ if (result.scaffoldSuggestions) {
 
 ### LLM providers
 
-| Provider | Import | When to use |
-|---|---|---|
-| `AnthropicProvider` | `new AnthropicProvider(apiKey, modelId?)` | Default. Highest quality. Requires `ANTHROPIC_API_KEY`. |
-| `OllamaProvider` | `new OllamaProvider({ model?, baseUrl?, apiKey? })` | Free local (no key) or Ollama Cloud (set `OLLAMA_API_KEY`). |
+| Provider            | Import                                              | When to use                                                 |
+| ------------------- | --------------------------------------------------- | ----------------------------------------------------------- |
+| `AnthropicProvider` | `new AnthropicProvider(apiKey, modelId?)`           | Default. Highest quality. Requires `ANTHROPIC_API_KEY`.     |
+| `OllamaProvider`    | `new OllamaProvider({ model?, baseUrl?, apiKey? })` | Free local (no key) or Ollama Cloud (set `OLLAMA_API_KEY`). |
 
 Both implement the same `LLMProvider` interface and are interchangeable. You can inject a mock for testing:
 
@@ -390,19 +396,23 @@ All errors extend `DocDriftError`. Catch specific subclasses for retry or fallba
 
 ```typescript
 import {
-  LLMTimeoutError,    // LLM call exceeded 30s — safe to retry
-  LLMRateLimitError,  // provider rate limit — back off before retrying
-  LLMParseError,      // LLM returned malformed output — retry once, then skip
-  LLMProviderError,   // generic provider error (network, API error)
-  GitHubRateLimitError,  // GitHub API rate limit; .resetAt is a Date
-  DiffTooLargeError,     // diff exceeded size limit
+  LLMTimeoutError, // LLM call exceeded 30s — safe to retry
+  LLMRateLimitError, // provider rate limit — back off before retrying
+  LLMParseError, // LLM returned malformed output — retry once, then skip
+  LLMProviderError, // generic provider error (network, API error)
+  GitHubRateLimitError, // GitHub API rate limit; .resetAt is a Date
+  DiffTooLargeError, // diff exceeded size limit
 } from "@docdrift/core";
 
 try {
   const result = await detector.detect(diffFiles, docFiles);
 } catch (err) {
-  if (err instanceof LLMTimeoutError) { /* retry */ }
-  if (err instanceof GitHubRateLimitError) { /* wait until err.resetAt */ }
+  if (err instanceof LLMTimeoutError) {
+    /* retry */
+  }
+  if (err instanceof GitHubRateLimitError) {
+    /* wait until err.resetAt */
+  }
 }
 ```
 
@@ -442,9 +452,9 @@ const llm = new OllamaProvider();
 // Ollama cloud
 const llm = new OllamaProvider({ model: "gpt-oss:120b" }); // reads OLLAMA_API_KEY from env
 
-const detector = new DriftDetector(llm);             // scaffoldEnabled defaults to true
-const result   = await detector.detect(diffFiles, docFiles);
-const comment  = buildPRComment(result, isFirstRun); // returns a markdown string
+const detector = new DriftDetector(llm); // scaffoldEnabled defaults to true
+const result = await detector.detect(diffFiles, docFiles);
+const comment = buildPRComment(result, isFirstRun); // returns a markdown string
 ```
 
 ---
