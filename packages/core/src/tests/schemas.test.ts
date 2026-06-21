@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DriftAnalysisSchema, FindingSchema } from "../drift/schemas.js";
+import { DriftAnalysisSchema, FindingSchema, ScaffoldOutputSchema } from "../drift/schemas.js";
 
 const validFinding = {
   docFile: "docs/api.md",
@@ -61,6 +61,38 @@ describe("DriftAnalysisSchema", () => {
     const result = DriftAnalysisSchema.safeParse({
       summary: "test",
       checkedDocFiles: [],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("ScaffoldOutputSchema", () => {
+  it("defaults suggestedDocs to [] when field is missing (model returns {})", () => {
+    const result = ScaffoldOutputSchema.safeParse({});
+    expect(result.success).toBe(true);
+    expect(result.data?.suggestedDocs).toEqual([]);
+  });
+
+  it("accepts valid scaffold output with suggestions", () => {
+    const result = ScaffoldOutputSchema.safeParse({
+      suggestedDocs: [
+        { filename: "README.md", content: "# Project", rationale: "No README found" },
+      ],
+      summary: "Generated 1 doc",
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.suggestedDocs).toHaveLength(1);
+  });
+
+  it("accepts empty suggestedDocs array (LLM finds no signal)", () => {
+    const result = ScaffoldOutputSchema.safeParse({ suggestedDocs: [], summary: "" });
+    expect(result.success).toBe(true);
+    expect(result.data?.suggestedDocs).toEqual([]);
+  });
+
+  it("rejects suggestion with empty filename", () => {
+    const result = ScaffoldOutputSchema.safeParse({
+      suggestedDocs: [{ filename: "", content: "# Project", rationale: "reason" }],
     });
     expect(result.success).toBe(false);
   });

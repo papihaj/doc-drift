@@ -92,12 +92,13 @@
 ## P2 — Confluence / Atlassian MCP Integration
 
 ### Confluence sync via Atlassian MCP
-**What:** When DocDrift finds drift and a user applies the suggested fix, automatically push the updated doc content to the corresponding Confluence page using the Atlassian MCP server.
-**Why:** Teams that maintain both GitHub markdown docs and Confluence pages today do it manually — they apply DocDrift's suggested patch to the markdown, then copy it over to Confluence. This automates that second step.
-**Inputs:** `confluence-url` and `confluence-api-token` are already wired into `action.yml`. The onboarding first-run comment now prompts users to add these if not set.
-**MCP surface:** Use the Atlassian MCP server (`@atlassian/mcp-atlassian`) to search for matching Confluence pages by title/label, then update page content via the Confluence REST API.
-**Decision points:** Page matching strategy (by title? by label? by a `.docdrift` frontmatter tag?), content format (Confluence Storage Format vs. markdown via a converter like `@atlassian/adf-utils`).
-**Effort:** L | **Priority:** P2 | **Depends on:** V1 shipped, user adoption, Atlassian MCP available
+**What:** Two distinct MCP-based capabilities: (1) **Outbound sync** — when drift is found and applied, push the updated content to the matching Confluence page via Atlassian MCP. (2) **DocDrift as MCP server** — a `packages/mcp` package that exposes drift analysis as an MCP tool, so Claude Code users can invoke DocDrift interactively and get Confluence suggestions in a chat session without a GitHub PR.
+**Why:** (1) Teams that maintain both markdown and Confluence do the copy manually — this automates it. (2) The GitHub Action covers CI/CD; an MCP server covers interactive developer workflows. These are separate distribution channels, not the same feature.
+**Note:** MCP is an interactive-session protocol (requires a host: Claude Code, Claude.ai, etc.). It cannot replace the GitHub Action for headless CI runs. The Action and MCP server are complementary.
+**Inputs:** `confluence-url` and `confluence-api-token` are already wired into `action.yml`. The onboarding first-run comment prompts users to add these if not set.
+**Decision points (outbound sync):** Page matching strategy (by title? by label? by a `.docdrift` frontmatter tag?), content format (Confluence Storage Format vs. markdown via `@atlassian/adf-utils`).
+**Decision points (MCP server):** Which tools to expose (`analyze_drift`, `suggest_confluence_pages`, `check_doc_coverage`), auth model (pass GitHub token per call or configure once), package name.
+**Effort:** L (outbound sync) + M (MCP server) | **Priority:** P2 | **Depends on:** V1 shipped, user adoption, Atlassian MCP available
 
 ---
 

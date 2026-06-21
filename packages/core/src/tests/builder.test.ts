@@ -149,3 +149,71 @@ describe("buildPRComment — scaffold mode", () => {
     expect(comment).toContain("DocDrift is now watching");
   });
 });
+
+describe("buildPRComment — Confluence suggestions", () => {
+  const confluenceOptions = {
+    confluenceConfigured: true,
+    confluenceUrl: "https://myorg.atlassian.net/wiki",
+    confluenceSpaceKey: "ENG",
+    confluenceEmpty: true,
+  };
+
+  it("renders suggestion title and inline bullet content", () => {
+    const comment = buildPRComment(baseResult, false, {
+      ...confluenceOptions,
+      confluenceSuggestions: [
+        {
+          filename: "Architecture Overview",
+          content: "- Overview\n- Component diagram\n- Configuration",
+          rationale: "No architecture doc found",
+        },
+      ],
+    });
+    expect(comment).toContain("📘 Suggested Confluence Pages");
+    expect(comment).toContain("Architecture Overview");
+    expect(comment).toContain("- Overview");
+    expect(comment).toContain("No architecture doc found");
+    expect(comment).not.toContain("```markdown");
+  });
+
+  it("shows fallback message when suggestions array is empty", () => {
+    const comment = buildPRComment(baseResult, false, {
+      ...confluenceOptions,
+      confluenceSuggestions: [],
+    });
+    expect(comment).toContain("No Confluence pages found");
+    expect(comment).not.toContain("📘 Suggested Confluence Pages");
+  });
+
+  it("skips content block when suggestion content is empty string", () => {
+    const comment = buildPRComment(baseResult, false, {
+      ...confluenceOptions,
+      confluenceSuggestions: [
+        { filename: "API Reference", content: "", rationale: "API endpoints added" },
+      ],
+    });
+    expect(comment).toContain("API Reference");
+    expect(comment).toContain("API endpoints added");
+  });
+
+  it("renders multiple suggestions", () => {
+    const comment = buildPRComment(baseResult, false, {
+      ...confluenceOptions,
+      confluenceSuggestions: [
+        { filename: "Page One", content: "- Section A", rationale: "reason one" },
+        { filename: "Page Two", content: "- Section B", rationale: "reason two" },
+      ],
+    });
+    expect(comment).toContain("Page One");
+    expect(comment).toContain("Page Two");
+    expect(comment).toContain("creating 2 pages");
+  });
+
+  it("shows fallback note when confluenceEmpty but no suggestions provided", () => {
+    const comment = buildPRComment(baseResult, false, {
+      ...confluenceOptions,
+      confluenceSuggestions: undefined,
+    });
+    expect(comment).toContain("No Confluence pages found");
+  });
+});

@@ -11,7 +11,7 @@ export const ScaffoldSuggestionSchema = z.object({
 export type ScaffoldSuggestion = z.infer<typeof ScaffoldSuggestionSchema>;
 
 export const ScaffoldOutputSchema = z.object({
-  suggestedDocs: z.array(ScaffoldSuggestionSchema),
+  suggestedDocs: z.array(ScaffoldSuggestionSchema).default([]),
   summary: z.string().max(2000).default(""),
 });
 export type ScaffoldOutput = z.infer<typeof ScaffoldOutputSchema>;

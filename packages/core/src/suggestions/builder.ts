@@ -90,15 +90,16 @@ function buildConfluenceEmptyNote(confluence: ConfluenceOptions): string {
     `---`,
     `## 📘 Suggested Confluence Pages`,
     ``,
-    `No pages found in your Confluence space${spaceLabel} matching these changes. DocDrift generated ${suggestions.length} page stub${suggestions.length !== 1 ? "s" : ""} you can add to [${spaceUrl}](${spaceUrl}).\n`,
+    `No pages found in your Confluence space${spaceLabel} matching these changes. DocDrift suggests creating ${suggestions.length} page${suggestions.length !== 1 ? "s" : ""} in [${spaceUrl}](${spaceUrl}):\n`,
   ];
 
   for (const s of suggestions) {
     parts.push(`### 📄 ${s.filename}`);
     parts.push(`_${s.rationale}_\n`);
-    parts.push("```markdown");
-    parts.push(s.content);
-    parts.push("```\n");
+    if (s.content.trim()) {
+      parts.push(s.content);
+    }
+    parts.push(``);
   }
 
   return parts.join("\n");
