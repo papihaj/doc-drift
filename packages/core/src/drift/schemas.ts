@@ -5,7 +5,7 @@ export type Severity = z.infer<typeof SeveritySchema>;
 
 export const ScaffoldSuggestionSchema = z.object({
   filename: z.string().min(1),
-  content: z.string().min(1).max(8000),
+  content: z.string().min(1).max(16000),
   rationale: z.string().min(1).max(500),
 });
 export type ScaffoldSuggestion = z.infer<typeof ScaffoldSuggestionSchema>;
