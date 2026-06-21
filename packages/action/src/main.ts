@@ -108,8 +108,19 @@ async function run(): Promise<void> {
     core.setOutput("findings-count", String(result.findings.length));
 
     const confluenceEmpty = confluenceConfigured && confluenceDocs.length === 0;
+
+    let confluenceSuggestions: Awaited<ReturnType<typeof detector.scaffoldConfluence>> | undefined;
+    if (confluenceEmpty) {
+      core.info("No Confluence pages found — generating page suggestions...");
+      try {
+        confluenceSuggestions = await detector.scaffoldConfluence(diff.files, result.findings);
+      } catch {
+        core.warning("Could not generate Confluence page suggestions.");
+      }
+    }
+
     const isFirstRun = await checkIsFirstRun(octokit, owner, repo, pullNumber);
-    const comment = `${DOCDRIFT_COMMENT_MARKER}\n${buildPRComment(result, isFirstRun, { confluenceConfigured, confluenceUrl, confluenceSpaceKey, confluenceEmpty })}`;
+    const comment = `${DOCDRIFT_COMMENT_MARKER}\n${buildPRComment(result, isFirstRun, { confluenceConfigured, confluenceUrl, confluenceSpaceKey, confluenceEmpty, confluenceSuggestions })}`;
 
     if (isFork) {
       core.info("PR is from a fork — skipping comment (insufficient permissions). Findings logged above.");

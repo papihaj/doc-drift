@@ -1,7 +1,7 @@
 import type { LLMProvider } from "../llm/interface.js";
 import type { DiffFile } from "../diff/analyzer.js";
 import type { DocFile } from "../docs/retriever.js";
-import { buildDriftPrompt, buildScaffoldPrompt } from "./prompt.js";
+import { buildDriftPrompt, buildScaffoldPrompt, buildConfluenceScaffoldPrompt } from "./prompt.js";
 import { chunkDiff } from "../diff/chunker.js";
 import {
   CONFIDENCE_THRESHOLD,
@@ -108,6 +108,12 @@ export class DriftDetector {
 
       throw err;
     }
+  }
+
+  async scaffoldConfluence(diffFiles: DiffFile[], findings: Finding[]): Promise<ScaffoldSuggestion[]> {
+    const prompt = buildConfluenceScaffoldPrompt(diffFiles, findings);
+    const output = await this.callScaffoldWithRetry(prompt);
+    return output.suggestedDocs;
   }
 
   private async callScaffoldWithRetry(prompt: string, attempt = 0): ReturnType<LLMProvider["scaffold"]> {

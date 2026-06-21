@@ -12,6 +12,7 @@ export interface ConfluenceOptions {
   confluenceUrl?: string;
   confluenceSpaceKey?: string;
   confluenceEmpty?: boolean;
+  confluenceSuggestions?: import("../drift/schemas.js").ScaffoldSuggestion[];
 }
 
 export function buildPRComment(result: DetectionResult, isFirstRun: boolean, confluence?: ConfluenceOptions): string {
@@ -29,7 +30,7 @@ export function buildPRComment(result: DetectionResult, isFirstRun: boolean, con
   if (result.scaffoldSuggestions !== undefined) {
     parts.push(...buildScaffoldSection(result.scaffoldSuggestions));
     if (confluence?.confluenceEmpty) {
-      parts.push(buildConfluenceEmptyNote(confluence, result.scaffoldSuggestions.map((s) => s.filename)));
+      parts.push(buildConfluenceEmptyNote(confluence));
     }
     const durationSec = (result.durationMs / 1000).toFixed(1);
     parts.push(`\n---\n_Analyzed in ${durationSec}s · ${result.modelId}_`);
@@ -41,7 +42,7 @@ export function buildPRComment(result: DetectionResult, isFirstRun: boolean, con
       `✅ **No drift detected.** DocDrift checked ${result.checkedDocFiles.length} doc file${result.checkedDocFiles.length !== 1 ? "s" : ""} — all up to date.\n`,
     );
     if (confluence?.confluenceEmpty) {
-      parts.push(buildConfluenceEmptyNote(confluence, result.checkedDocFiles));
+      parts.push(buildConfluenceEmptyNote(confluence));
     }
   } else {
     const high = result.findings.filter((f) => f.severity === "high").length;
@@ -63,7 +64,7 @@ export function buildPRComment(result: DetectionResult, isFirstRun: boolean, con
     }
 
     if (confluence?.confluenceEmpty) {
-      parts.push(buildConfluenceEmptyNote(confluence, [...new Set(result.findings.map((f) => f.docFile))]));
+      parts.push(buildConfluenceEmptyNote(confluence));
     }
   }
 
@@ -75,16 +76,32 @@ export function buildPRComment(result: DetectionResult, isFirstRun: boolean, con
   return parts.join("\n");
 }
 
-function buildConfluenceEmptyNote(confluence: ConfluenceOptions, relatedFiles: string[]): string {
+function buildConfluenceEmptyNote(confluence: ConfluenceOptions): string {
   const spaceLabel = confluence.confluenceSpaceKey ? ` \`${confluence.confluenceSpaceKey}\`` : "";
-  const fileList = relatedFiles.slice(0, 5).map((f) => `- \`${f}\``).join("\n");
-  return [
+  const spaceUrl = confluence.confluenceUrl ?? "your Confluence space";
+
+  if (!confluence.confluenceSuggestions || confluence.confluenceSuggestions.length === 0) {
+    return `\n> **No Confluence pages found** for these changes in space${spaceLabel}. Consider adding documentation at ${spaceUrl}.`;
+  }
+
+  const suggestions = confluence.confluenceSuggestions;
+  const parts: string[] = [
     ``,
-    `> **No Confluence pages found** for these changes in space${spaceLabel}. Consider adding pages covering:`,
-    fileList,
-    `>`,
-    `> You can create them at ${confluence.confluenceUrl ?? "your Confluence space"}.`,
-  ].join("\n");
+    `---`,
+    `## 📘 Suggested Confluence Pages`,
+    ``,
+    `No pages found in your Confluence space${spaceLabel} matching these changes. DocDrift generated ${suggestions.length} page stub${suggestions.length !== 1 ? "s" : ""} you can add to [${spaceUrl}](${spaceUrl}).\n`,
+  ];
+
+  for (const s of suggestions) {
+    parts.push(`### 📄 ${s.filename}`);
+    parts.push(`_${s.rationale}_\n`);
+    parts.push("```markdown");
+    parts.push(s.content);
+    parts.push("```\n");
+  }
+
+  return parts.join("\n");
 }
 
 function buildConfluenceOnboardingNote(confluence?: ConfluenceOptions): string {
