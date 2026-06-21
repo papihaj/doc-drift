@@ -102,6 +102,28 @@
 
 ---
 
+## P2 — Template System Extensions
+
+### Weekly doc health report (scheduled cron trigger)
+**What:** A scheduled GitHub Actions cron job that runs DocDrift weekly across all recent PRs (or open issues) and posts a summary "doc health report" as a GitHub issue or comment on a configured Slack/GitHub Discussions thread.
+**Why:** Drift detection on PRs catches new problems; a weekly sweep catches drift that accumulated before DocDrift was installed, and keeps the team aware of total documentation debt, not just the latest PR's delta.
+**Pros:** Passive value without any PR activity; converts DocDrift from a PR tool into a continuous monitoring tool.
+**Cons:** Requires scheduled trigger support in the action (trivially addable with `on: schedule:` in workflow YAML), but the LLM cost could be significant if scanning all recent PRs.
+**Context:** Implement as a separate workflow trigger: `eventName === "schedule"`. Fetch the last N merged PRs (configurable), run drift detection on each, aggregate findings, post summary issue. Add `report-pr-count` input (default: 10) and `report-issue-label` input (default: `docdrift-report`).
+**Effort:** M | **Priority:** P2 | **Depends on:** V1 templates shipped, cost modeling for LLM usage at scale
+
+---
+
+### Template customization via `.docdrift.yml`
+**What:** A repo-level `.docdrift.yml` configuration file that overrides default template behavior: custom sections to include/exclude, custom audience phrasing, custom title patterns, and per-branch template pinning.
+**Why:** The auto-classifier covers 80% of cases, but some repos have conventions the heuristics can't infer (e.g., "all PRs to `api/` should always create API reference + migration guide regardless of branch name"). Without this, teams must pass `doc-template` input on every workflow call.
+**Pros:** Makes the template system production-grade for enterprise teams; reduces workflow YAML boilerplate.
+**Cons:** Adds a config surface; must validate the file format and give clear errors on malformed YAML.
+**Context:** Parse `.docdrift.yml` in `packages/action/src/main.ts` early in `run()`, before template classification. Schema: `{ templates: { branches: { "feat/*": ["architecture"] }, labels: { "breaking": ["migration-guide", "api-reference"] } }, audience: { "release-notes": "external" }, titles: { "release-notes": "Release Notes v{version}" } }`. Merge with action inputs; explicit inputs win.
+**Effort:** M | **Priority:** P2 | **Depends on:** template classifier shipped (done in this session)
+
+---
+
 ## Explicitly Skipped
 
 - **Doc coverage score** — premature without 30+ days of findings data; revisit in V2

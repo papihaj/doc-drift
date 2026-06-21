@@ -22,8 +22,90 @@ export interface DiffFile {
   patch: string;
 }
 
+export interface ReleaseContext {
+  version: string;
+  tagName: string;
+  mergedPRs: { number: number; title: string; url: string; author: string }[];
+}
+
 export class DiffAnalyzer {
   constructor(private readonly octokit: Octokit) {}
+
+  async fetchSinceTag(
+    owner: string,
+    repo: string,
+    head: string,
+    tagPrefix = "v",
+  ): Promise<{ diff: ParsedDiff; release: ReleaseContext }> {
+    // Find last release tag
+    let baseTag: string;
+    let version: string;
+    try {
+      const { data: release } = await this.octokit.rest.repos.getLatestRelease({ owner, repo });
+      baseTag = release.tag_name;
+      version = release.tag_name.replace(new RegExp(`^${tagPrefix}`), "");
+    } catch {
+      // No releases yet — fall back to first commit
+      const { data: commits } = await this.octokit.rest.repos.listCommits({
+        owner, repo, per_page: 1, sha: head,
+      });
+      const firstCommit = commits[0];
+      if (!firstCommit) throw new Error("Repository has no commits");
+      baseTag = firstCommit.sha;
+      version = "initial";
+    }
+
+    // Compare base..head to get changed files
+    const { data: comparison } = await this.octokit.rest.repos.compareCommitsWithBasehead({
+      owner,
+      repo,
+      basehead: `${baseTag}...${head}`,
+    });
+
+    const files = comparison.files ?? [];
+    const parsedFiles: DiffFile[] = [];
+    let totalBytes = 0;
+    let truncated = false;
+
+    for (const file of files) {
+      const patch = file.patch ?? "";
+      const bytes = Buffer.byteLength(patch, "utf8");
+      if (totalBytes + bytes > MAX_DIFF_BYTES) { truncated = true; break; }
+      totalBytes += bytes;
+      parsedFiles.push({
+        path: file.filename,
+        status: file.status as DiffFile["status"],
+        additions: file.additions ?? 0,
+        deletions: file.deletions ?? 0,
+        patch,
+      });
+    }
+
+    // Collect merged PRs from commit messages
+    const mergedPRs: ReleaseContext["mergedPRs"] = [];
+    const seenPRs = new Set<number>();
+    for (const commit of comparison.commits) {
+      const match = commit.commit.message.match(/Merge pull request #(\d+)/);
+      if (match) {
+        const num = parseInt(match[1]!, 10);
+        if (!seenPRs.has(num)) {
+          seenPRs.add(num);
+          const lines = commit.commit.message.split("\n");
+          mergedPRs.push({
+            number: num,
+            title: lines[2]?.trim() ?? lines[0]?.trim() ?? `PR #${num}`,
+            url: `https://github.com/${owner}/${repo}/pull/${num}`,
+            author: commit.author?.login ?? commit.commit.author?.name ?? "unknown",
+          });
+        }
+      }
+    }
+
+    return {
+      diff: { files: parsedFiles, rawDiff: "", truncated },
+      release: { version, tagName: baseTag, mergedPRs },
+    };
+  }
 
   async fetch(owner: string, repo: string, pullNumber: number): Promise<ParsedDiff> {
     const files = await this.fetchPRFiles(owner, repo, pullNumber);

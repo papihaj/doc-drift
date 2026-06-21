@@ -1,5 +1,7 @@
 import type { Finding, ScaffoldSuggestion } from "../drift/schemas.js";
 import type { DetectionResult } from "../drift/detector.js";
+import type { TemplateType } from "../templates/types.js";
+import { TEMPLATES } from "../templates/types.js";
 
 const SEVERITY_EMOJI: Record<Finding["severity"], string> = {
   high: "🔴",
@@ -13,7 +15,9 @@ export interface ConfluenceOptions {
   confluenceSpaceKey?: string;
   confluenceEmpty?: boolean;
   confluenceSuggestions?: import("../drift/schemas.js").ScaffoldSuggestion[];
-  createdPages?: { title: string; url: string }[];
+  createdPages?: { title: string; url: string; wasUpdated?: boolean }[];
+  plannedTemplates?: TemplateType[];      // shown as preview on PR before merge
+  dryRunPages?: { title: string; content: string }[];  // preview mode: content shown, not created
 }
 
 export function buildPRComment(result: DetectionResult, isFirstRun: boolean, confluence?: ConfluenceOptions): string {
@@ -81,19 +85,52 @@ function buildConfluenceEmptyNote(confluence: ConfluenceOptions): string {
   const spaceLabel = confluence.confluenceSpaceKey ? ` \`${confluence.confluenceSpaceKey}\`` : "";
   const spaceUrl = confluence.confluenceUrl ?? "your Confluence space";
 
-  // Pages were auto-created — show links
-  if (confluence.createdPages && confluence.createdPages.length > 0) {
-    const pages = confluence.createdPages;
+  // Dry-run mode: show full content, don't create
+  if (confluence.dryRunPages && confluence.dryRunPages.length > 0) {
     const parts: string[] = [
       ``,
       `---`,
-      `## 📘 Confluence Pages Created`,
+      `## 📋 Confluence Page Preview (dry-run mode)`,
       ``,
-      `No documentation existed for these changes. DocDrift created ${pages.length} page${pages.length !== 1 ? "s" : ""} in your Confluence space${spaceLabel}:\n`,
+      `DocDrift would create ${confluence.dryRunPages.length} page${confluence.dryRunPages.length !== 1 ? "s" : ""} in your Confluence space${spaceLabel}. Set \`confluence-preview: false\` to create them automatically.\n`,
     ];
-    for (const p of pages) {
-      parts.push(`- 📄 [${p.title}](${p.url})`);
+    for (const p of confluence.dryRunPages) {
+      parts.push(`<details><summary>📄 ${p.title}</summary>\n\n${p.content}\n\n</details>\n`);
     }
+    return parts.join("\n");
+  }
+
+  // Pages were auto-created (or updated) — show links
+  if (confluence.createdPages && confluence.createdPages.length > 0) {
+    const pages = confluence.createdPages;
+    const created = pages.filter((p) => !p.wasUpdated);
+    const updated = pages.filter((p) => p.wasUpdated);
+    const parts: string[] = [``, `---`, `## 📘 Confluence Pages`, ``];
+
+    if (created.length > 0) {
+      parts.push(`**Created** ${created.length} new page${created.length !== 1 ? "s" : ""} in your Confluence space${spaceLabel}:\n`);
+      for (const p of created) parts.push(`- 📄 [${p.title}](${p.url})`);
+    }
+    if (updated.length > 0) {
+      if (created.length > 0) parts.push(``);
+      parts.push(`**Updated** ${updated.length} existing page${updated.length !== 1 ? "s" : ""}:\n`);
+      for (const p of updated) parts.push(`- 🔄 [${p.title}](${p.url})`);
+    }
+    return parts.join("\n");
+  }
+
+  // PR preview — planned templates, not yet created
+  if (confluence.plannedTemplates && confluence.plannedTemplates.length > 0) {
+    const labels = confluence.plannedTemplates.map((t) => TEMPLATES[t]?.label ?? t);
+    const parts: string[] = [
+      ``,
+      `---`,
+      `## 📋 DocDrift will create when this PR merges`,
+      ``,
+      `Based on the changes in this PR, DocDrift will create the following Confluence pages in space${spaceLabel}:\n`,
+    ];
+    for (const label of labels) parts.push(`- 📄 ${label}`);
+    parts.push(`\n_Override with \`doc-template: architecture|api-reference|setup-guide|release-notes|migration-guide\` or preview with \`confluence-preview: true\`._`);
     return parts.join("\n");
   }
 

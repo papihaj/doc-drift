@@ -7,6 +7,8 @@ export interface CreatedPage {
   url: string;
 }
 
+const DOCDRIFT_LABEL = "docdrift-generated";
+
 export class ConfluenceWriter {
   private readonly authHeader: string;
   private readonly apiBase: string;
@@ -19,6 +21,37 @@ export class ConfluenceWriter {
       this.authHeader = `Bearer ${config.apiToken}`;
     }
     this.apiBase = config.baseUrl.replace(/\/+$/, "");
+  }
+
+  // Idempotent: finds by title and updates if exists, creates otherwise.
+  async upsertPage(
+    title: string,
+    markdownContent: string,
+    spaceKey: string,
+    parentId?: string,
+  ): Promise<CreatedPage & { wasUpdated: boolean }> {
+    const existing = await this.findPageByTitle(title, spaceKey);
+    if (existing) {
+      const page = await this.updatePage(existing.id, title, markdownContent);
+      return { ...page, wasUpdated: true };
+    }
+    const page = await this.createPage(title, markdownContent, spaceKey, parentId);
+    return { ...page, wasUpdated: false };
+  }
+
+  async findPageByTitle(title: string, spaceKey: string): Promise<{ id: string } | null> {
+    const cql = `title="${encodeURIComponent(title).replace(/%20/g, " ")}" AND space.key="${spaceKey}" AND type=page`;
+    const url = new URL(`${this.apiBase}/rest/api/content/search`);
+    url.searchParams.set("cql", cql);
+    url.searchParams.set("limit", "1");
+
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: this.authHeader, Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+
+    const data = (await res.json()) as { results?: { id: string }[] };
+    return data.results?.[0] ?? null;
   }
 
   async createPage(
@@ -38,6 +71,9 @@ export class ConfluenceWriter {
           value: storageBody,
           representation: "storage",
         },
+      },
+      metadata: {
+        labels: [{ name: DOCDRIFT_LABEL, prefix: "global" }],
       },
     };
 

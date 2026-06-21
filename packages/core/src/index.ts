@@ -27,7 +27,12 @@ export type { Finding, DriftAnalysis, ScaffoldSuggestion, ScaffoldOutput, Severi
 
 export { buildPRComment } from "./suggestions/builder.js";
 export type { ConfluenceOptions } from "./suggestions/builder.js";
-export { buildScaffoldPrompt } from "./drift/prompt.js";
+export { buildScaffoldPrompt, buildTemplatePrompt } from "./drift/prompt.js";
+export type { MergedPR } from "./drift/prompt.js";
+export { classifyChange, classifyPushEvent } from "./templates/classifier.js";
+export { TEMPLATES } from "./templates/types.js";
+export type { TemplateType, TemplateAudience, DocTemplate } from "./templates/types.js";
+export type { ReleaseContext } from "./diff/analyzer.js";
 
 export type { LLMProvider } from "./llm/interface.js";
 export { AnthropicProvider } from "./llm/anthropic.js";

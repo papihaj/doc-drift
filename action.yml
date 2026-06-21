@@ -40,6 +40,18 @@ inputs:
   confluence-parent-page-id:
     description: "Confluence page ID to nest auto-created pages under. Optional."
     required: false
+  confluence-preview:
+    description: "When true, post full page content in the PR comment instead of creating Confluence pages (dry-run). Default: false."
+    required: false
+    default: "false"
+  doc-template:
+    description: "Which documentation template to use: auto (default), architecture, api-reference, setup-guide, release-notes, migration-guide."
+    required: false
+    default: "auto"
+  release-tag-prefix:
+    description: "Tag prefix used to identify release tags when generating release notes on push events. Default: v"
+    required: false
+    default: "v"
 
 outputs:
   findings-count:
