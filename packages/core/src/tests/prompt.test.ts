@@ -102,12 +102,12 @@ describe("buildConfluenceScaffoldPrompt", () => {
     expect(prompt.toLowerCase()).toContain("first");
   });
 
-  it("instructs model to use Stripe-style structured content (tables, field defs)", () => {
+  it("instructs model to use Stripe-style structured content (tables, field defs) with comprehensive explanations", () => {
     const prompt = buildConfluenceScaffoldPrompt(sampleDiff, []);
     expect(prompt).toContain("markdown table");
     expect(prompt).toContain("field definition");
+    expect(prompt).toContain("comprehensive");
     expect(prompt).not.toContain("600 words");
-    expect(prompt).not.toContain("complete page");
   });
 
   it("includes findings in DRIFT_FINDINGS block when present", () => {
