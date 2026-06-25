@@ -3,6 +3,8 @@ import * as github from "@actions/github";
 import { Octokit } from "@octokit/rest";
 import {
   AnthropicProvider,
+  HuggingFaceProvider,
+  FallbackProvider,
   DiffAnalyzer,
   DocRetriever,
   ConfluenceRetriever,
@@ -16,7 +18,10 @@ import {
   LLMParseError,
   PRNotFoundError,
   GitHubAuthError,
+  LLMRateLimitError,
+  GitHubRateLimitError,
 } from "@docdrift/core";
+import type { LLMProvider, LayoutRecommendation } from "@docdrift/core";
 
 const DOCDRIFT_COMMENT_MARKER = "<!-- docdrift-analysis -->";
 
@@ -24,16 +29,23 @@ async function run(): Promise<void> {
   const ctx = github.context;
   const isPR = ctx.eventName === "pull_request";
   const isPush = ctx.eventName === "push";
+  const isComment = ctx.eventName === "issue_comment";
 
-  if (!isPR && !isPush) {
-    core.info(`DocDrift only runs on pull_request and push events. Got: ${ctx.eventName}. Skipping.`);
+  if (!isPR && !isPush && !isComment) {
+    core.info(`DocDrift only runs on pull_request, push, and issue_comment events. Got: ${ctx.eventName}. Skipping.`);
     return;
   }
 
   const { owner, repo } = ctx.repo;
   const token = core.getInput("github-token", { required: true });
-  const anthropicKey = core.getInput("anthropic-api-key");
-  const modelId = core.getInput("model") || "claude-haiku-4-5-20251001";
+
+  if (isComment) {
+    await runCommentEvent({ ctx, octokit: new Octokit({ auth: token }), owner, repo });
+    return;
+  }
+  const hfKey = core.getInput("huggingface-api-key") || undefined;
+  const anthropicKey = core.getInput("anthropic-api-key") || undefined;
+  const modelId = core.getInput("model") || undefined;
   const confluenceUrl = core.getInput("confluence-url") || undefined;
   const confluenceEmail = core.getInput("confluence-email") || undefined;
   const confluenceToken = core.getInput("confluence-api-token") || undefined;
@@ -45,13 +57,12 @@ async function run(): Promise<void> {
   const scaffoldEnabled = core.getInput("scaffold-missing-docs") !== "false";
   const confluenceConfigured = !!(confluenceUrl && confluenceToken);
 
-  if (!anthropicKey) {
-    core.setFailed("anthropic-api-key is required.");
+  if (!hfKey && !anthropicKey) {
+    core.setFailed("Either huggingface-api-key or anthropic-api-key is required.");
     return;
   }
 
-  const llm = new AnthropicProvider(anthropicKey, modelId);
-  core.info(`Using Anthropic (${modelId})`);
+  const llm = buildLLMProvider({ hfKey, anthropicKey, modelId });
 
   const octokit = new Octokit({ auth: token });
   const analyzer = new DiffAnalyzer(octokit);
@@ -128,6 +139,23 @@ async function run(): Promise<void> {
       core.info("Confluence: not configured. Skipping page creation.");
     }
 
+    // Fetch space structure to produce a layout recommendation before creating pages
+    let layoutRecommendation: LayoutRecommendation | undefined;
+    if (confluenceConfigured && confluenceSpaceKey && confluenceRetriever && selectedTemplates.length > 0) {
+      const structure = await confluenceRetriever.fetchSpaceStructure(confluenceSpaceKey);
+      if (structure) {
+        layoutRecommendation = confluenceRetriever.recommendLayout(structure, diff.files);
+        core.info(`Confluence layout recommendation: ${layoutRecommendation.recommendation} — ${layoutRecommendation.rationale}`);
+      }
+    }
+
+    // Check if the user already replied with a layout choice in a prior comment
+    const layoutChoice = await getLayoutChoiceFromComments(octokit, owner, repo, pullNumber);
+    if (layoutChoice) {
+      core.info(`Confluence layout choice from PR comment: ${layoutChoice}`);
+      layoutRecommendation = undefined; // user chose — no longer show the prompt
+    }
+
     let createdPages: { title: string; url: string; wasUpdated?: boolean }[] = [];
     let dryRunPages: { title: string; content: string }[] = [];
     let confluenceSuggestions = result.scaffoldSuggestions;
@@ -180,6 +208,7 @@ async function run(): Promise<void> {
       createdPages,
       dryRunPages: dryRunPages.length > 0 ? dryRunPages : undefined,
       plannedTemplates: confluenceEmpty && confluenceConfigured && !confluenceSpaceKey ? selectedTemplates : undefined,
+      layoutRecommendation,
     })}`;
 
     if (isFork) {
@@ -195,12 +224,17 @@ async function run(): Promise<void> {
       core.setFailed(`DocDrift config error: ${(err as Error).message}`);
       return;
     }
-    if (err instanceof LLMTimeoutError || err instanceof LLMProviderError) {
+    if (err instanceof LLMTimeoutError || err instanceof LLMProviderError || err instanceof LLMRateLimitError) {
       core.warning(`DocDrift temporarily unavailable: ${(err as Error).message}`);
       if (!isFork) {
         await upsertComment(octokit, owner, repo, pullNumber,
           `${DOCDRIFT_COMMENT_MARKER}\n> DocDrift is temporarily unavailable. Analysis will run on the next push.`);
       }
+      return;
+    }
+    if (err instanceof GitHubRateLimitError) {
+      const resetAt = (err as InstanceType<typeof GitHubRateLimitError>).resetAt;
+      core.warning(`GitHub rate limit hit. Resets at ${resetAt.toISOString()}.`);
       return;
     }
     throw err;
@@ -211,7 +245,7 @@ async function runPushEvent(opts: {
   ctx: typeof github.context;
   octokit: Octokit;
   analyzer: DiffAnalyzer;
-  llm: AnthropicProvider;
+  llm: LLMProvider;
   owner: string;
   repo: string;
   confluenceConfigured: boolean;
@@ -313,23 +347,131 @@ function makeConfluenceWriter(
   });
 }
 
+/** Paginates through all PR comments to find the DocDrift marker (avoids per_page:50 miss). */
+async function findDocDriftComment(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  pullNumber: number,
+): Promise<{ id: number } | null> {
+  let page = 1;
+  while (true) {
+    const { data: comments } = await octokit.rest.issues.listComments({
+      owner, repo, issue_number: pullNumber, per_page: 100, page,
+    });
+    const found = comments.find((c) => c.body?.includes(DOCDRIFT_COMMENT_MARKER));
+    if (found) return { id: found.id };
+    if (comments.length < 100) return null;
+    page++;
+  }
+}
+
 async function checkIsFirstRun(octokit: Octokit, owner: string, repo: string, pullNumber: number): Promise<boolean> {
-  const { data: comments } = await octokit.rest.issues.listComments({
-    owner, repo, issue_number: pullNumber, per_page: 50,
-  });
-  return !comments.some((c) => c.body?.includes(DOCDRIFT_COMMENT_MARKER));
+  const existing = await findDocDriftComment(octokit, owner, repo, pullNumber);
+  return existing === null;
 }
 
 async function upsertComment(octokit: Octokit, owner: string, repo: string, pullNumber: number, body: string): Promise<void> {
-  const { data: comments } = await octokit.rest.issues.listComments({
-    owner, repo, issue_number: pullNumber, per_page: 50,
-  });
-  const existing = comments.find((c) => c.body?.includes(DOCDRIFT_COMMENT_MARKER));
+  const existing = await findDocDriftComment(octokit, owner, repo, pullNumber);
   if (existing) {
     await octokit.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
   } else {
     await octokit.rest.issues.createComment({ owner, repo, issue_number: pullNumber, body });
   }
+}
+
+/** Handles `/docdrift single-page` or `/docdrift multi-page` replies on PR comments. */
+async function runCommentEvent(opts: {
+  ctx: typeof github.context;
+  octokit: Octokit;
+  owner: string;
+  repo: string;
+}): Promise<void> {
+  const { ctx, octokit, owner, repo } = opts;
+  const comment = ctx.payload.comment as { body?: string; user?: { login: string } } | undefined;
+  const issue = ctx.payload.issue as { number?: number; pull_request?: unknown } | undefined;
+
+  // Only handle comments on PRs (not regular issues)
+  if (!issue?.pull_request || !issue.number) {
+    core.info("issue_comment: not a PR comment. Skipping.");
+    return;
+  }
+
+  const body = comment?.body ?? "";
+  const choice = body.match(/\/docdrift\s+(single-page|multi-page)/i)?.[1]?.toLowerCase();
+  if (!choice) {
+    core.info("issue_comment: no /docdrift command found. Skipping.");
+    return;
+  }
+
+  // Verify commenter has write/maintain/admin access
+  const actor = comment?.user?.login ?? "";
+  const { data: perm } = await octokit.rest.repos.getCollaboratorPermissionLevel({
+    owner, repo, username: actor,
+  });
+  const allowedPerms = ["write", "maintain", "admin"];
+  if (!allowedPerms.includes(perm.permission)) {
+    core.info(`issue_comment: ${actor} has permission "${perm.permission}" — not authorised to set layout. Skipping.`);
+    return;
+  }
+
+  core.info(`Confluence layout choice "${choice}" from @${actor} on PR #${issue.number}.`);
+  // Post an acknowledgement comment — actual page creation happens on next PR push
+  await octokit.rest.issues.createComment({
+    owner,
+    repo,
+    issue_number: issue.number,
+    body: `> DocDrift received your layout choice: **${choice}**. Pages will be created using the **${choice === "single-page" ? "single comprehensive page" : "multiple focused pages"}** layout on the next commit push to this PR.`,
+  });
+}
+
+/**
+ * Scans PR comments for a prior `/docdrift single-page|multi-page` reply.
+ * Returns the chosen layout or null if no choice has been made.
+ */
+async function getLayoutChoiceFromComments(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  pullNumber: number,
+): Promise<"single-page" | "multi-page" | null> {
+  let page = 1;
+  while (true) {
+    const { data: comments } = await octokit.rest.issues.listComments({
+      owner, repo, issue_number: pullNumber, per_page: 100, page,
+    });
+    for (const c of comments) {
+      const match = c.body?.match(/\/docdrift\s+(single-page|multi-page)/i);
+      if (match) return match[1]!.toLowerCase() as "single-page" | "multi-page";
+    }
+    if (comments.length < 100) break;
+    page++;
+  }
+  return null;
+}
+
+function buildLLMProvider(opts: {
+  hfKey: string | undefined;
+  anthropicKey: string | undefined;
+  modelId: string | undefined;
+}): LLMProvider {
+  const { hfKey, anthropicKey, modelId } = opts;
+
+  if (hfKey) {
+    const hfModel = modelId ?? "deepseek-ai/DeepSeek-V4-Pro:novita";
+    const hfProvider = new HuggingFaceProvider({ apiKey: hfKey, model: hfModel });
+    if (anthropicKey) {
+      const anthropicProvider = new AnthropicProvider(anthropicKey, "claude-haiku-4-5-20251001");
+      core.info(`Using HuggingFace (${hfModel}) with Anthropic fallback`);
+      return new FallbackProvider(hfProvider, anthropicProvider);
+    }
+    core.info(`Using HuggingFace (${hfModel})`);
+    return hfProvider;
+  }
+
+  const anthropicModel = modelId ?? "claude-haiku-4-5-20251001";
+  core.info(`Using Anthropic (${anthropicModel})`);
+  return new AnthropicProvider(anthropicKey!, anthropicModel);
 }
 
 run().catch((err: unknown) => {

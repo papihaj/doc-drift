@@ -18,6 +18,7 @@ export interface ConfluenceOptions {
   createdPages?: { title: string; url: string; wasUpdated?: boolean }[];
   plannedTemplates?: TemplateType[];      // shown as preview on PR before merge
   dryRunPages?: { title: string; content: string }[];  // preview mode: content shown, not created
+  layoutRecommendation?: import("../docs/confluence.js").LayoutRecommendation;  // shown when awaiting user layout choice
 }
 
 export function buildPRComment(result: DetectionResult, isFirstRun: boolean, confluence?: ConfluenceOptions): string {
@@ -86,12 +87,47 @@ function shouldShowConfluenceSection(confluence?: ConfluenceOptions): boolean {
   if (confluence.createdPages?.length) return true;
   if (confluence.dryRunPages?.length) return true;
   if (confluence.plannedTemplates?.length) return true;
+  if (confluence.layoutRecommendation) return true;
   return !!confluence.confluenceEmpty;
+}
+
+function buildLayoutChoiceSection(rec: import("../docs/confluence.js").LayoutRecommendation, spaceLabel: string): string {
+  const emoji = rec.recommendation === "multi-page" ? "📚" : "📄";
+  const recLabel = rec.recommendation === "multi-page" ? "Multiple pages" : "Single page";
+  const altLabel = rec.recommendation === "multi-page" ? "single-page" : "multi-page";
+  const altDesc = rec.recommendation === "multi-page"
+    ? "one comprehensive page covering all changes"
+    : "2-3 focused pages (Architecture, API Reference, Setup)";
+
+  const structureDetails = rec.structure.rootPages.length > 0
+    ? `Current space${spaceLabel}: **${rec.structure.totalPages} pages**, ${rec.structure.isHierarchical ? "hierarchical (pages with children)" : "flat structure"}.`
+    : `No pages found in space${spaceLabel} yet.`;
+
+  return [
+    ``,
+    `---`,
+    `## 📋 Confluence Page Layout`,
+    ``,
+    `${structureDetails}`,
+    ``,
+    `${emoji} **Recommendation: ${recLabel}** — ${rec.rationale}`,
+    ``,
+    `Reply to this comment to choose:`,
+    `- \`/docdrift multi-page\` — Create 2-3 focused pages (Architecture, API Reference, Setup)`,
+    `- \`/docdrift single-page\` — Create ${altLabel === "single-page" ? altDesc : "one comprehensive page"}`,
+    ``,
+    `_DocDrift will create the Confluence pages after you reply. No action needed if you want the recommended option — DocDrift will proceed automatically on the next push._`,
+  ].join("\n");
 }
 
 function buildConfluenceSection(confluence: ConfluenceOptions): string {
   const spaceLabel = confluence.confluenceSpaceKey ? ` \`${confluence.confluenceSpaceKey}\`` : "";
   const spaceUrl = confluence.confluenceUrl ?? "your Confluence space";
+
+  // Layout choice prompt — awaiting user decision
+  if (confluence.layoutRecommendation) {
+    return buildLayoutChoiceSection(confluence.layoutRecommendation, spaceLabel);
+  }
 
   // Dry-run mode: show full content, don't create
   if (confluence.dryRunPages && confluence.dryRunPages.length > 0) {

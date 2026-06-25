@@ -6,7 +6,7 @@ export type { DiffChunk } from "./diff/chunker.js";
 export { DocRetriever } from "./docs/retriever.js";
 export type { DocFile } from "./docs/retriever.js";
 export { ConfluenceRetriever } from "./docs/confluence.js";
-export type { ConfluenceConfig } from "./docs/confluence.js";
+export type { ConfluenceConfig, SpaceStructure, LayoutRecommendation } from "./docs/confluence.js";
 export { ConfluenceWriter } from "./docs/confluence-writer.js";
 export type { CreatedPage } from "./docs/confluence-writer.js";
 export { markdownToStorage } from "./docs/markdown-to-storage.js";
@@ -37,5 +37,7 @@ export type { ReleaseContext } from "./diff/analyzer.js";
 export type { LLMProvider } from "./llm/interface.js";
 export { AnthropicProvider } from "./llm/anthropic.js";
 export { OllamaProvider } from "./llm/ollama.js";
+export { HuggingFaceProvider } from "./llm/huggingface.js";
+export { FallbackProvider } from "./llm/fallback.js";
 
 export * from "./errors.js";

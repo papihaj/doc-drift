@@ -6,8 +6,11 @@ branding:
   color: "blue"
 
 inputs:
+  huggingface-api-key:
+    description: "HuggingFace API token (HF_TOKEN). When set, used as primary LLM. Falls back to Anthropic if anthropic-api-key is also provided."
+    required: false
   anthropic-api-key:
-    description: "Anthropic API key. Required."
+    description: "Anthropic API key. Used as primary when huggingface-api-key is not set; used as fallback when both are provided."
     required: false
   github-token:
     description: "GitHub token for reading diffs and posting comments"
